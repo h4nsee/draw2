@@ -36,34 +36,14 @@
         .task-text { font-size: 15px; font-weight: 600; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .top-controls { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
         
-        /* Стили для красивой кнопки смены слова */
         #change-word-btn {
-            background: var(--tool-bg);
-            border: 1px solid var(--border-color);
-            color: var(--text-color);
-            padding: 8px 14px;
-            border-radius: 10px;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 14px;
-            transition: all 0.2s ease;
+            background: var(--tool-bg); border: 1px solid var(--border-color); color: var(--text-color);
+            padding: 8px 14px; border-radius: 10px; font-weight: 600; cursor: pointer;
+            display: flex; align-items: center; gap: 6px; font-size: 14px; transition: all 0.2s ease;
         }
-
-        #change-word-btn:active {
-            transform: scale(0.95);
-            background: var(--border-color);
-        }
-
-        #change-word-btn svg {
-            transition: transform 0.4s ease;
-        }
-
-        #change-word-btn:active svg {
-            transform: rotate(180deg);
-        }
+        #change-word-btn:active { transform: scale(0.95); background: var(--border-color); }
+        #change-word-btn svg { transition: transform 0.4s ease; }
+        #change-word-btn:active svg { transform: rotate(180deg); }
 
         #theme-btn { width: 40px; height: 40px; background: none; border: 1px solid var(--border-color); border-radius: 50%; color: var(--text-color); display: flex; align-items: center; justify-content: center; }
         .theme-icon { width: 20px; height: 20px; fill: currentColor; }
@@ -72,8 +52,7 @@
         canvas { display: block; touch-action: none; transform-origin: center; }
         
         .chat-box {
-            height: 70px;
-            background: var(--panel-color); border: 1px solid var(--border-color); border-radius: 12px;
+            height: 70px; background: var(--panel-color); border: 1px solid var(--border-color); border-radius: 12px;
             margin: 0 10px 10px 10px; overflow-y: auto; padding: 8px; font-size: 14px;
             display: flex; flex-direction: column; gap: 4px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
         }
@@ -132,9 +111,7 @@
 
     <div id="canvas-wrapper"><canvas id="canvas"></canvas></div>
 
-    <div class="chat-box" id="chat-box">
-        <div class="chat-msg" style="color: #8e8e93; font-style: italic;">Здесь появятся ответы игроков...</div>
-    </div>
+    <div class="chat-box" id="chat-box"></div>
 
     <div class="toolbar">
         <div class="tools-and-colors">
@@ -166,14 +143,16 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
         tg.ready();
-        tg.enableClosingConfirmation();
+
+        // 🔥 Ключевое исправление: Получаем ID чата из системы Telegram
+        const chatId = tg.initDataUnsafe.start_param;
 
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        const params = new URLSearchParams(window.location.search);
         let drawing = false, history = [], currentColor = '#000000', currentTool = 'brush';
         let startX = 0, startY = 0, hasMoved = false, savedImageData = null;
         const DEFAULT_BG_COLOR = "#ffffff";
+        
         let currentScale = 1, translateX = 0, translateY = 0;
         let initialPinchDistance = null, initialPinchCenter = null;
         let startScale = 1, startTranslateX = 0, startTranslateY = 0;
@@ -224,7 +203,6 @@
         }
 
         function init() {
-            document.getElementById('task-text').innerText = params.get('word') || "Ожидание слова...";
             applyTheme(localStorage.getItem('user_theme') || tg.colorScheme);
 
             const container = document.getElementById('canvas-wrapper');
@@ -268,6 +246,7 @@
             } 
         }
 
+        // --- ЛОГИКА ЗАЛИВКИ ---
         function floodFill(x, y, fillColor) {
             const dpr = window.devicePixelRatio || 1;
             const w = canvas.width; const h = canvas.height;
@@ -316,6 +295,7 @@
             return { x: (t.clientX - rect.left) * scaleX, y: (t.clientY - rect.top) * scaleY };
         };
 
+        // --- ТАЧ-СОБЫТИЯ ---
         canvas.addEventListener('touchstart', (e) => { 
             if(e.target.closest('.toolbar, .top-bar')) return;
             e.preventDefault(); 
@@ -393,23 +373,28 @@
 
         function clearCanvas() { ctx.fillStyle = "#ffffff"; ctx.fillRect(0,0,canvas.width,canvas.height); saveState(); }
 
+        // --- СЕТЕВЫЕ ФУНКЦИИ ---
         function sendFrameToServer() {
+            if (!chatId) return;
             canvas.toBlob((blob) => {
                 const formData = new FormData();
                 formData.append('image', blob, 'drawing.png');
-                formData.append('chat_id', params.get('chat_id') || '0');
+                formData.append('chat_id', chatId);
                 fetch('https://krizisphone.fun/croc_upload', {
                     method: 'POST', body: formData, mode: 'cors'
                 }).catch(e => console.log("Сбой отправки кадра", e));
             }, 'image/png');
         }
 
-        function fetchChatMessages() {
-            const chatId = params.get('chat_id');
+        function fetchUpdate() {
             if (!chatId) return;
             fetch(`https://krizisphone.fun/croc_get_chat?chat_id=${chatId}`)
             .then(res => res.json())
             .then(data => {
+                // Обновляем слово, если оно есть
+                if (data.word) document.getElementById('task-text').innerText = data.word;
+
+                // Обновляем сообщения игроков
                 const chatBox = document.getElementById('chat-box');
                 chatBox.innerHTML = '';
                 if (data.messages && data.messages.length > 0) {
@@ -423,11 +408,10 @@
                 } else {
                     chatBox.innerHTML = '<div class="chat-msg" style="color: #8e8e93; font-style: italic;">Ждем догадки игроков...</div>';
                 }
-            }).catch(e => console.log("Сбой получения чата", e));
+            }).catch(e => console.log("Сбой обновления", e));
         }
 
         function requestNewWord() {
-            const chatId = params.get('chat_id');
             if (!chatId) { alert("Ошибка: нет ID чата"); return; }
             fetch(`https://krizisphone.fun/croc_change_word?chat_id=${chatId}`)
             .then(res => res.json())
@@ -440,8 +424,8 @@
         }
 
         function startNetworkTasks() {
-            setInterval(sendFrameToServer, 10000);
-            setInterval(fetchChatMessages, 2000);
+            setInterval(sendFrameToServer, 6000); // Отправка рисунка каждые 6 сек
+            setInterval(fetchUpdate, 2000);        // Чат и слово каждые 2 сек
         }
 
         init();
