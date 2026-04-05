@@ -48,15 +48,20 @@
         #theme-btn { width: 40px; height: 40px; background: none; border: 1px solid var(--border-color); border-radius: 50%; color: var(--text-color); display: flex; align-items: center; justify-content: center; cursor: pointer; }
         .theme-icon { width: 20px; height: 20px; fill: currentColor; }
         
-        /* Добавлена граница (border) для выделения холста */
+        /* Фон под холстом теперь отличается, чтобы видеть границы при зуме */
         #canvas-wrapper { 
-            flex-grow: 1; position: relative; background: var(--canvas-bg); 
+            flex-grow: 1; position: relative; background: var(--bg-color); 
             margin: 10px; border-radius: 16px; overflow: hidden; 
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             border: 2px solid var(--border-color); 
             box-sizing: border-box;
         }
-        canvas { display: block; touch-action: none; transform-origin: center; cursor: crosshair; }
+        /* Сам холст получил фон и границу */
+        canvas { 
+            display: block; touch-action: none; transform-origin: center; cursor: crosshair; 
+            background-color: var(--canvas-bg);
+            outline: 2px solid var(--accent-color); 
+        }
         
         .chat-box {
             height: 70px; background: var(--panel-color); border: 1px solid var(--border-color); border-radius: 12px;
@@ -426,7 +431,6 @@
 
         canvas.addEventListener('mouseup', handleMouseUpLeave);
         canvas.addEventListener('mouseleave', handleMouseUpLeave);
-
 
         function clearCanvas() { ctx.fillStyle = "#ffffff"; ctx.fillRect(0,0,canvas.width,canvas.height); saveState(); }
 
