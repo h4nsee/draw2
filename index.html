@@ -86,9 +86,29 @@
         #clear-btn { color: var(--danger-color); }
         #undo-btn { color: var(--accent-color); }
         .icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+
+        /* Экран блокировки для не-ведущих */
+        #not-host-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--bg-color); color: var(--text-color);
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 9999; text-align: center; padding: 20px; box-sizing: border-box;
+        }
+        .lock-icon { width: 64px; height: 64px; margin-bottom: 20px; color: var(--accent-color); }
+        .lock-title { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+        .lock-text { font-size: 16px; color: #8e8e93; line-height: 1.4; }
     </style>
 </head>
 <body>
+    <div id="not-host-screen">
+        <svg class="lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+        <div class="lock-title">Вы не ведущий!</div>
+        <div class="lock-text">Только ведущий может рисовать.<br>Возвращайтесь в чат и угадывайте слово!</div>
+    </div>
+
     <div class="top-bar">
         <div class="task-wrapper">
             <div class="task-label">Рисуй:</div>
@@ -135,7 +155,7 @@
         <div class="size-row">
             <input type="range" id="size-slider" min="2" max="35" value="7">
             <button class="action-btn" id="undo-btn" onclick="undo()"><svg class="icon" viewBox="0 0 24 24"><path d="M3 10h10a5 5 0 0 1 5 5 5 5 0 0 1-5 5H3m4-6-4-4 4-4"/></svg></button>
-            <button class="action-btn" id="clear-btn" onclick="clearCanvas()"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+            <button class="action-btn" id="clear-btn" onclick="clearCanvas()"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"/></svg></button>
         </div>
     </div>
 
@@ -144,8 +164,8 @@
         tg.expand();
         tg.ready();
 
-        // 🔥 Ключевое исправление: Получаем ID чата из системы Telegram
         const chatId = tg.initDataUnsafe.start_param;
+        const userId = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : null;
 
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -246,7 +266,6 @@
             } 
         }
 
-        // --- ЛОГИКА ЗАЛИВКИ ---
         function floodFill(x, y, fillColor) {
             const dpr = window.devicePixelRatio || 1;
             const w = canvas.width; const h = canvas.height;
@@ -295,7 +314,6 @@
             return { x: (t.clientX - rect.left) * scaleX, y: (t.clientY - rect.top) * scaleY };
         };
 
-        // --- ТАЧ-СОБЫТИЯ ---
         canvas.addEventListener('touchstart', (e) => { 
             if(e.target.closest('.toolbar, .top-bar')) return;
             e.preventDefault(); 
@@ -373,7 +391,6 @@
 
         function clearCanvas() { ctx.fillStyle = "#ffffff"; ctx.fillRect(0,0,canvas.width,canvas.height); saveState(); }
 
-        // --- СЕТЕВЫЕ ФУНКЦИИ ---
         function sendFrameToServer() {
             if (!chatId) return;
             canvas.toBlob((blob) => {
@@ -391,10 +408,16 @@
             fetch(`https://krizisphone.fun/croc_get_chat?chat_id=${chatId}`)
             .then(res => res.json())
             .then(data => {
-                // Обновляем слово, если оно есть
+                // ПРОВЕРКА: Если есть ID ведущего, и это не тот, кто открыл мини-апп
+                if (data.host_id && userId && String(data.host_id) !== String(userId)) {
+                    document.getElementById('not-host-screen').style.display = 'flex';
+                    return; // Дальше ничего не обновляем, рисунок заблокирован
+                } else {
+                    document.getElementById('not-host-screen').style.display = 'none';
+                }
+
                 if (data.word) document.getElementById('task-text').innerText = data.word;
 
-                // Обновляем сообщения игроков
                 const chatBox = document.getElementById('chat-box');
                 chatBox.innerHTML = '';
                 if (data.messages && data.messages.length > 0) {
@@ -424,8 +447,8 @@
         }
 
         function startNetworkTasks() {
-            setInterval(sendFrameToServer, 6000); // Отправка рисунка каждые 6 сек
-            setInterval(fetchUpdate, 2000);        // Чат и слово каждые 2 сек
+            setInterval(sendFrameToServer, 6000); 
+            setInterval(fetchUpdate, 2000);        
         }
 
         init();
