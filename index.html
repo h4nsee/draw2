@@ -45,11 +45,18 @@
         #change-word-btn svg { transition: transform 0.4s ease; }
         #change-word-btn:active svg { transform: rotate(180deg); }
 
-        #theme-btn { width: 40px; height: 40px; background: none; border: 1px solid var(--border-color); border-radius: 50%; color: var(--text-color); display: flex; align-items: center; justify-content: center; }
+        #theme-btn { width: 40px; height: 40px; background: none; border: 1px solid var(--border-color); border-radius: 50%; color: var(--text-color); display: flex; align-items: center; justify-content: center; cursor: pointer; }
         .theme-icon { width: 20px; height: 20px; fill: currentColor; }
         
-        #canvas-wrapper { flex-grow: 1; position: relative; background: var(--canvas-bg); margin: 10px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-        canvas { display: block; touch-action: none; transform-origin: center; }
+        /* Добавлена граница (border) для выделения холста */
+        #canvas-wrapper { 
+            flex-grow: 1; position: relative; background: var(--canvas-bg); 
+            margin: 10px; border-radius: 16px; overflow: hidden; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            border: 2px solid var(--border-color); 
+            box-sizing: border-box;
+        }
+        canvas { display: block; touch-action: none; transform-origin: center; cursor: crosshair; }
         
         .chat-box {
             height: 70px; background: var(--panel-color); border: 1px solid var(--border-color); border-radius: 12px;
@@ -78,16 +85,15 @@
         .main-brush-btn svg, .tool-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
         .size-row { display: flex; align-items: center; gap: 12px; color: #8e8e93; font-size: 13px; }
-        input[type=range] { flex-grow: 1; -webkit-appearance: none; background: transparent; }
+        input[type=range] { flex-grow: 1; -webkit-appearance: none; background: transparent; cursor: pointer; }
         input[type=range]::-webkit-slider-runnable-track { background: var(--border-color); height: 5px; border-radius: 3px; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; background: var(--accent-color); border-radius: 50%; margin-top: -8px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; background: var(--accent-color); border-radius: 50%; margin-top: -8px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); cursor: pointer; }
         
         .action-btn { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--panel-color); display: flex; align-items: center; justify-content: center; cursor: pointer; }
         #clear-btn { color: var(--danger-color); }
         #undo-btn { color: var(--accent-color); }
         .icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 
-        /* Экран блокировки для не-ведущих */
         #not-host-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background-color: var(--bg-color); color: var(--text-color);
@@ -314,6 +320,51 @@
             return { x: (t.clientX - rect.left) * scaleX, y: (t.clientY - rect.top) * scaleY };
         };
 
+        // --- ЛОГИКА РИСОВАНИЯ ---
+        function startDrawingLogic(p) {
+            startX = p.x; startY = p.y;
+            ctx.lineWidth = document.getElementById('size-slider').value;
+            ctx.globalAlpha = currentTool === 'marker' ? 0.3 : 1.0;
+            ctx.fillStyle = currentTool === 'eraser' ? DEFAULT_BG_COLOR : currentColor;
+            ctx.strokeStyle = currentTool === 'eraser' ? DEFAULT_BG_COLOR : currentColor;
+            if (currentTool === 'fill') {
+                floodFill(p.x, p.y, currentColor); saveState(); drawing = false;
+            } else if (currentTool === 'rect' || currentTool === 'circle') {
+                savedImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.beginPath(); ctx.moveTo(p.x, p.y); 
+            }
+        }
+
+        function moveDrawingLogic(p) {
+            if (currentTool === 'brush' || currentTool === 'marker' || currentTool === 'eraser') {
+                ctx.lineTo(p.x, p.y); ctx.stroke(); 
+            } else if (currentTool === 'spray') {
+                for (let i = 0; i < 10; i++) {
+                    let offsetX = (Math.random() - 0.5) * ctx.lineWidth * 2;
+                    let offsetY = (Math.random() - 0.5) * ctx.lineWidth * 2;
+                    ctx.fillRect(p.x + offsetX, p.y + offsetY, 2, 2);
+                }
+            } else if (currentTool === 'rect') {
+                ctx.putImageData(savedImageData, 0, 0);
+                ctx.strokeRect(startX, startY, p.x - startX, p.y - startY);
+            } else if (currentTool === 'circle') {
+                ctx.putImageData(savedImageData, 0, 0);
+                let radius = Math.hypot(p.x - startX, p.y - startY);
+                ctx.beginPath(); ctx.arc(startX, startY, radius, 0, Math.PI * 2); ctx.stroke();
+            }
+        }
+
+        function endDrawingLogic() {
+            if (!hasMoved && ['brush', 'marker', 'spray', 'eraser'].includes(currentTool)) {
+                ctx.globalAlpha = currentTool === 'marker' ? 0.3 : 1.0;
+                ctx.fillStyle = currentTool === 'eraser' ? DEFAULT_BG_COLOR : currentColor;
+                ctx.beginPath(); ctx.arc(startX, startY, document.getElementById('size-slider').value / 2, 0, Math.PI * 2); ctx.fill();
+            }
+            ctx.globalAlpha = 1.0; saveState(); drawing = false; 
+        }
+
+        // --- СОБЫТИЯ ТАЧСКРИНА ---
         canvas.addEventListener('touchstart', (e) => { 
             if(e.target.closest('.toolbar, .top-bar')) return;
             e.preventDefault(); 
@@ -326,19 +377,7 @@
             }
             if (e.touches.length === 1) {
                 drawing = true; hasMoved = false;
-                let p = getPos(e); 
-                startX = p.x; startY = p.y;
-                ctx.lineWidth = document.getElementById('size-slider').value;
-                ctx.globalAlpha = currentTool === 'marker' ? 0.3 : 1.0;
-                ctx.fillStyle = currentTool === 'eraser' ? DEFAULT_BG_COLOR : currentColor;
-                ctx.strokeStyle = currentTool === 'eraser' ? DEFAULT_BG_COLOR : currentColor;
-                if (currentTool === 'fill') {
-                    floodFill(p.x, p.y, currentColor); saveState(); drawing = false;
-                } else if (currentTool === 'rect' || currentTool === 'circle') {
-                    savedImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                } else {
-                    ctx.beginPath(); ctx.moveTo(p.x, p.y); 
-                }
+                startDrawingLogic(getPos(e));
             }
         }, {passive: false});
 
@@ -357,37 +396,37 @@
             }
             if(drawing && e.touches.length === 1) { 
                 hasMoved = true;
-                let p = getPos(e);
-                if (currentTool === 'brush' || currentTool === 'marker' || currentTool === 'eraser') {
-                    ctx.lineTo(p.x, p.y); ctx.stroke(); 
-                } else if (currentTool === 'spray') {
-                    for (let i = 0; i < 10; i++) {
-                        let offsetX = (Math.random() - 0.5) * ctx.lineWidth * 2;
-                        let offsetY = (Math.random() - 0.5) * ctx.lineWidth * 2;
-                        ctx.fillRect(p.x + offsetX, p.y + offsetY, 2, 2);
-                    }
-                } else if (currentTool === 'rect') {
-                    ctx.putImageData(savedImageData, 0, 0);
-                    ctx.strokeRect(startX, startY, p.x - startX, p.y - startY);
-                } else if (currentTool === 'circle') {
-                    ctx.putImageData(savedImageData, 0, 0);
-                    let radius = Math.hypot(p.x - startX, p.y - startY);
-                    ctx.beginPath(); ctx.arc(startX, startY, radius, 0, Math.PI * 2); ctx.stroke();
-                }
+                moveDrawingLogic(getPos(e));
             }
         }, {passive: false});
 
         canvas.addEventListener('touchend', (e) => { 
             if (e.touches.length < 2) { initialPinchDistance = null; initialPinchCenter = null; }
             if(drawing && e.touches.length === 0) { 
-                if (!hasMoved && ['brush', 'marker', 'spray', 'eraser'].includes(currentTool)) {
-                    ctx.globalAlpha = currentTool === 'marker' ? 0.3 : 1.0;
-                    ctx.fillStyle = currentTool === 'eraser' ? DEFAULT_BG_COLOR : currentColor;
-                    ctx.beginPath(); ctx.arc(startX, startY, document.getElementById('size-slider').value / 2, 0, Math.PI * 2); ctx.fill();
-                }
-                ctx.globalAlpha = 1.0; saveState(); drawing = false; 
+                endDrawingLogic();
             }
         });
+
+        // --- СОБЫТИЯ МЫШИ (ДЛЯ ПК) ---
+        canvas.addEventListener('mousedown', (e) => {
+            if(e.target.closest('.toolbar, .top-bar')) return;
+            drawing = true; hasMoved = false;
+            startDrawingLogic(getPos(e));
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if(!drawing) return;
+            hasMoved = true;
+            moveDrawingLogic(getPos(e));
+        });
+
+        const handleMouseUpLeave = () => {
+            if(drawing) endDrawingLogic();
+        };
+
+        canvas.addEventListener('mouseup', handleMouseUpLeave);
+        canvas.addEventListener('mouseleave', handleMouseUpLeave);
+
 
         function clearCanvas() { ctx.fillStyle = "#ffffff"; ctx.fillRect(0,0,canvas.width,canvas.height); saveState(); }
 
@@ -408,10 +447,9 @@
             fetch(`https://krizisphone.fun/croc_get_chat?chat_id=${chatId}`)
             .then(res => res.json())
             .then(data => {
-                // ПРОВЕРКА: Если есть ID ведущего, и это не тот, кто открыл мини-апп
                 if (data.host_id && userId && String(data.host_id) !== String(userId)) {
                     document.getElementById('not-host-screen').style.display = 'flex';
-                    return; // Дальше ничего не обновляем, рисунок заблокирован
+                    return; 
                 } else {
                     document.getElementById('not-host-screen').style.display = 'none';
                 }
