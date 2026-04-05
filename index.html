@@ -48,7 +48,6 @@
         #theme-btn { width: 40px; height: 40px; background: none; border: 1px solid var(--border-color); border-radius: 50%; color: var(--text-color); display: flex; align-items: center; justify-content: center; cursor: pointer; }
         .theme-icon { width: 20px; height: 20px; fill: currentColor; }
         
-        /* Фон под холстом теперь отличается, чтобы видеть границы при зуме */
         #canvas-wrapper { 
             flex-grow: 1; position: relative; background: var(--bg-color); 
             margin: 10px; border-radius: 16px; overflow: hidden; 
@@ -56,7 +55,7 @@
             border: 2px solid var(--border-color); 
             box-sizing: border-box;
         }
-        /* Сам холст получил фон и границу */
+
         canvas { 
             display: block; touch-action: none; transform-origin: center; cursor: crosshair; 
             background-color: var(--canvas-bg);
@@ -68,7 +67,7 @@
             margin: 0 10px 10px 10px; overflow-y: auto; padding: 8px; font-size: 14px;
             display: flex; flex-direction: column; gap: 4px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
         }
-        .chat-msg { line-height: 1.3; }
+        .chat-msg { line-height: 1.3; word-break: break-word; }
         .chat-author { font-weight: bold; color: var(--accent-color); margin-right: 5px; }
 
         .toolbar { background: var(--panel-color); padding: 15px; border-top: 1px solid var(--border-color); padding-bottom: calc(15px + env(safe-area-inset-bottom)); position: relative; }
@@ -108,9 +107,28 @@
         .lock-icon { width: 64px; height: 64px; margin-bottom: 20px; color: var(--accent-color); }
         .lock-title { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
         .lock-text { font-size: 16px; color: #8e8e93; line-height: 1.4; }
+
+        #error-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--bg-color); color: var(--text-color);
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 10000; text-align: center; padding: 20px; box-sizing: border-box;
+        }
+        .error-title { font-size: 24px; font-weight: bold; margin-bottom: 10px; color: var(--danger-color); }
+        .error-text { font-size: 16px; color: #8e8e93; line-height: 1.4; max-width: 320px; }
+
+        .disabled-ui {
+            opacity: 0.5;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
+    <div id="error-screen">
+        <div class="error-title">Ошибка запуска</div>
+        <div class="error-text" id="error-text">Не удалось получить данные игры.</div>
+    </div>
+
     <div id="not-host-screen">
         <svg class="lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
@@ -120,7 +138,7 @@
         <div class="lock-text">Только ведущий может рисовать.<br>Возвращайтесь в чат и угадывайте слово!</div>
     </div>
 
-    <div class="top-bar">
+    <div class="top-bar" id="top-bar">
         <div class="task-wrapper">
             <div class="task-label">Рисуй:</div>
             <div class="task-text" id="task-text">Загрузка...</div>
@@ -144,7 +162,7 @@
 
     <div class="chat-box" id="chat-box"></div>
 
-    <div class="toolbar">
+    <div class="toolbar" id="toolbar">
         <div class="tools-and-colors">
             <div class="palette" id="palette"></div>
             <div class="divider"></div>
@@ -175,29 +193,83 @@
         tg.expand();
         tg.ready();
 
-        const chatId = tg.initDataUnsafe.start_param;
-        const userId = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : null;
+        const gameId = tg.initDataUnsafe?.start_param || "";
+        const userId = tg.initDataUnsafe?.user ? tg.initDataUnsafe.user.id : null;
 
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        let drawing = false, history = [], currentColor = '#000000', currentTool = 'brush';
-        let startX = 0, startY = 0, hasMoved = false, savedImageData = null;
+        const topBar = document.getElementById('top-bar');
+        const toolbar = document.getElementById('toolbar');
+        const changeWordBtn = document.getElementById('change-word-btn');
+        const notHostScreen = document.getElementById('not-host-screen');
+        const errorScreen = document.getElementById('error-screen');
+        const errorText = document.getElementById('error-text');
+        const chatBox = document.getElementById('chat-box');
+        const taskText = document.getElementById('task-text');
+
+        let drawing = false;
+        let history = [];
+        let currentColor = '#000000';
+        let currentTool = 'brush';
+        let startX = 0;
+        let startY = 0;
+        let hasMoved = false;
+        let savedImageData = null;
         const DEFAULT_BG_COLOR = "#ffffff";
         
-        let currentScale = 1, translateX = 0, translateY = 0;
-        let initialPinchDistance = null, initialPinchCenter = null;
-        let startScale = 1, startTranslateX = 0, startTranslateY = 0;
+        let currentScale = 1;
+        let translateX = 0;
+        let translateY = 0;
+        let initialPinchDistance = null;
+        let initialPinchCenter = null;
+        let startScale = 1;
+        let startTranslateX = 0;
+        let startTranslateY = 0;
+
+        let isHost = true;
+        let updateTimer = null;
+        let frameTimer = null;
+
+        function showError(text) {
+            errorText.textContent = text;
+            errorScreen.style.display = 'flex';
+            topBar.classList.add('disabled-ui');
+            toolbar.classList.add('disabled-ui');
+            canvas.style.pointerEvents = 'none';
+        }
+
+        function setHostMode(value) {
+            isHost = value;
+
+            if (isHost) {
+                notHostScreen.style.display = 'none';
+                topBar.classList.remove('disabled-ui');
+                toolbar.classList.remove('disabled-ui');
+                canvas.style.pointerEvents = 'auto';
+                changeWordBtn.style.display = 'flex';
+            } else {
+                notHostScreen.style.display = 'flex';
+                topBar.classList.add('disabled-ui');
+                toolbar.classList.add('disabled-ui');
+                canvas.style.pointerEvents = 'none';
+                changeWordBtn.style.display = 'none';
+                drawing = false;
+            }
+        }
 
         function applyTheme(theme) {
             const sun = document.getElementById('sun-icon');
             const moon = document.getElementById('moon-icon');
+
             if (theme === 'light') {
                 document.body.classList.add('light-theme');
-                sun.style.display = 'none'; moon.style.display = 'block';
+                sun.style.display = 'none';
+                moon.style.display = 'block';
                 tg.setHeaderColor('#ffffff');
             } else {
                 document.body.classList.remove('light-theme');
-                sun.style.display = 'block'; moon.style.display = 'none';
+                sun.style.display = 'block';
+                moon.style.display = 'none';
                 tg.setHeaderColor('#1c1c1e');
             }
         }
@@ -213,137 +285,239 @@
             const menu = document.getElementById('brushes-menu');
             const mainIcon = document.getElementById('main-brush-icon');
             const firstToolBtn = menu.querySelector('.tool-btn.active');
+
             mainIcon.innerHTML = firstToolBtn.querySelector('svg').innerHTML;
             currentTool = firstToolBtn.dataset.tool;
 
-            mainBtn.onclick = (e) => { e.stopPropagation(); menu.classList.toggle('open'); };
+            mainBtn.onclick = (e) => {
+                e.stopPropagation();
+                if (!isHost) return;
+                menu.classList.toggle('open');
+            };
 
             menu.querySelectorAll('.tool-btn').forEach(btn => {
                 btn.onclick = (e) => {
                     e.stopPropagation();
+                    if (!isHost) return;
+
                     menu.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     currentTool = btn.dataset.tool;
                     mainIcon.innerHTML = btn.querySelector('svg').innerHTML;
-                    if(['fill','circle','rect'].includes(currentTool)) { mainBtn.classList.remove('active'); } 
-                    else { mainBtn.classList.add('active'); }
+
+                    if (['fill', 'circle', 'rect'].includes(currentTool)) {
+                        mainBtn.classList.remove('active');
+                    } else {
+                        mainBtn.classList.add('active');
+                    }
+
                     menu.classList.remove('open');
                 };
             });
-            document.addEventListener('click', () => { if(menu.classList.contains('open')) menu.classList.remove('open'); });
+
+            document.addEventListener('click', () => {
+                if (menu.classList.contains('open')) menu.classList.remove('open');
+            });
         }
 
         function init() {
             applyTheme(localStorage.getItem('user_theme') || tg.colorScheme);
 
+            if (!gameId) {
+                showError('Не удалось получить ID игры. Открой рисовалку заново из сообщения бота.');
+                return;
+            }
+
             const container = document.getElementById('canvas-wrapper');
             const dpr = window.devicePixelRatio || 1;
+
             canvas.width = container.clientWidth * dpr;
             canvas.height = container.clientHeight * dpr;
             ctx.scale(dpr, dpr);
-            canvas.style.width = container.clientWidth + 'px'; canvas.style.height = container.clientHeight + 'px';
-            ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-            ctx.fillStyle = DEFAULT_BG_COLOR; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            canvas.style.width = container.clientWidth + 'px';
+            canvas.style.height = container.clientHeight + 'px';
+
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.fillStyle = DEFAULT_BG_COLOR;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
             saveState();
 
-            const colors = [ '#000000', '#7f7f7f', '#8B4513', '#ff3b30', '#FF69B4', '#ff9500', '#ffcc00', '#34c759', '#006400', '#008080', '#007aff', '#00008B', '#5856d6', '#8e44ad', '#c8a2c8', '#ffffff' ];
+            const colors = ['#000000', '#7f7f7f', '#8B4513', '#ff3b30', '#FF69B4', '#ff9500', '#ffcc00', '#34c759', '#006400', '#008080', '#007aff', '#00008B', '#5856d6', '#8e44ad', '#c8a2c8', '#ffffff'];
+
             colors.forEach(c => {
                 const dot = document.createElement('div');
-                dot.className = 'color-dot'; dot.style.background = c;
-                if(c === currentColor) dot.classList.add('active');
+                dot.className = 'color-dot';
+                dot.style.background = c;
+
+                if (c === currentColor) dot.classList.add('active');
+
                 dot.onclick = () => {
+                    if (!isHost) return;
                     document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
-                    dot.classList.add('active'); currentColor = c;
+                    dot.classList.add('active');
+                    currentColor = c;
                 };
+
                 document.getElementById('palette').appendChild(dot);
             });
+
             initBrushesSelector();
             startNetworkTasks();
         }
 
-        function saveState() { 
+        function saveState() {
             if (history.length > 20) history.shift();
             history.push(canvas.toDataURL());
         }
 
-        function undo() { 
-            if (history.length > 1) { 
+        function undo() {
+            if (!isHost) return;
+
+            if (history.length > 1) {
                 history.pop();
-                let img = new Image(); img.src = history[history.length-1];
-                img.onload = () => { 
-                    ctx.clearRect(0,0,canvas.width,canvas.height);
-                    ctx.drawImage(img,0,0,canvas.width/(window.devicePixelRatio||1),canvas.height/(window.devicePixelRatio||1)); 
+                const img = new Image();
+                img.src = history[history.length - 1];
+                img.onload = () => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(
+                        img,
+                        0,
+                        0,
+                        canvas.width / (window.devicePixelRatio || 1),
+                        canvas.height / (window.devicePixelRatio || 1)
+                    );
                 };
-            } 
+            }
+        }
+
+        function clearCanvas() {
+            if (!isHost) return;
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            saveState();
         }
 
         function floodFill(x, y, fillColor) {
             const dpr = window.devicePixelRatio || 1;
-            const w = canvas.width; const h = canvas.height;
-            const px = Math.floor(x * dpr); const py = Math.floor(y * dpr);
+            const w = canvas.width;
+            const h = canvas.height;
+            const px = Math.floor(x * dpr);
+            const py = Math.floor(y * dpr);
+
             const imageData = ctx.getImageData(0, 0, w, h);
             const data = imageData.data;
             const stack = [[px, py]];
+
             const hex = fillColor.replace('#', '');
-            const r = parseInt(hex.substring(0,2), 16); const g = parseInt(hex.substring(2,4), 16); const b = parseInt(hex.substring(4,6), 16);
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+
             const startPos = (py * w + px) * 4;
-            const startR = data[startPos]; const startG = data[startPos+1]; const startB = data[startPos+2];
+            const startR = data[startPos];
+            const startG = data[startPos + 1];
+            const startB = data[startPos + 2];
 
             if (r === startR && g === startG && b === startB) return;
-            const colorPixel = (pos) => { data[pos] = r; data[pos+1] = g; data[pos+2] = b; data[pos+3] = 255; };
-            const matchStartColor = (pos) => { return data[pos] === startR && data[pos+1] === startG && data[pos+2] === startB; };
-            while(stack.length) {
+
+            const colorPixel = (pos) => {
+                data[pos] = r;
+                data[pos + 1] = g;
+                data[pos + 2] = b;
+                data[pos + 3] = 255;
+            };
+
+            const matchStartColor = (pos) => {
+                return data[pos] === startR && data[pos + 1] === startG && data[pos + 2] === startB;
+            };
+
+            while (stack.length) {
                 let [cx, cy] = stack.pop();
                 let currentPos = (cy * w + cx) * 4;
-                while(cy >= 0 && matchStartColor(currentPos)) { cy--; currentPos -= w * 4; }
-                cy++; currentPos += w * 4;
-                let reachLeft = false, reachRight = false;
-                while(cy < h && matchStartColor(currentPos)) {
+
+                while (cy >= 0 && matchStartColor(currentPos)) {
+                    cy--;
+                    currentPos -= w * 4;
+                }
+
+                cy++;
+                currentPos += w * 4;
+
+                let reachLeft = false;
+                let reachRight = false;
+
+                while (cy < h && matchStartColor(currentPos)) {
                     colorPixel(currentPos);
-                    if(cx > 0) {
-                        if(matchStartColor(currentPos - 4)) {
-                            if(!reachLeft) { stack.push([cx - 1, cy]); reachLeft = true; }
-                        } else if(reachLeft) { reachLeft = false; }
+
+                    if (cx > 0) {
+                        if (matchStartColor(currentPos - 4)) {
+                            if (!reachLeft) {
+                                stack.push([cx - 1, cy]);
+                                reachLeft = true;
+                            }
+                        } else if (reachLeft) {
+                            reachLeft = false;
+                        }
                     }
-                    if(cx < w - 1) {
-                        if(matchStartColor(currentPos + 4)) {
-                            if(!reachRight) { stack.push([cx + 1, cy]); reachRight = true; }
-                        } else if(reachRight) { reachRight = false; }
+
+                    if (cx < w - 1) {
+                        if (matchStartColor(currentPos + 4)) {
+                            if (!reachRight) {
+                                stack.push([cx + 1, cy]);
+                                reachRight = true;
+                            }
+                        } else if (reachRight) {
+                            reachRight = false;
+                        }
                     }
-                    cy++; currentPos += w * 4;
+
+                    cy++;
+                    currentPos += w * 4;
                 }
             }
+
             ctx.putImageData(imageData, 0, 0);
         }
 
-        const getPos = (e) => { 
+        function getPos(e) {
             const rect = canvas.getBoundingClientRect();
-            const t = e.touches ? e.touches[0] : e; 
+            const t = e.touches ? e.touches[0] : e;
             const dpr = window.devicePixelRatio || 1;
             const scaleX = canvas.width / (rect.width * dpr);
             const scaleY = canvas.height / (rect.height * dpr);
-            return { x: (t.clientX - rect.left) * scaleX, y: (t.clientY - rect.top) * scaleY };
-        };
 
-        // --- ЛОГИКА РИСОВАНИЯ ---
+            return {
+                x: (t.clientX - rect.left) * scaleX,
+                y: (t.clientY - rect.top) * scaleY
+            };
+        }
+
         function startDrawingLogic(p) {
-            startX = p.x; startY = p.y;
+            startX = p.x;
+            startY = p.y;
             ctx.lineWidth = document.getElementById('size-slider').value;
             ctx.globalAlpha = currentTool === 'marker' ? 0.3 : 1.0;
             ctx.fillStyle = currentTool === 'eraser' ? DEFAULT_BG_COLOR : currentColor;
             ctx.strokeStyle = currentTool === 'eraser' ? DEFAULT_BG_COLOR : currentColor;
+
             if (currentTool === 'fill') {
-                floodFill(p.x, p.y, currentColor); saveState(); drawing = false;
+                floodFill(p.x, p.y, currentColor);
+                saveState();
+                drawing = false;
             } else if (currentTool === 'rect' || currentTool === 'circle') {
                 savedImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             } else {
-                ctx.beginPath(); ctx.moveTo(p.x, p.y); 
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
             }
         }
 
         function moveDrawingLogic(p) {
             if (currentTool === 'brush' || currentTool === 'marker' || currentTool === 'eraser') {
-                ctx.lineTo(p.x, p.y); ctx.stroke(); 
+                ctx.lineTo(p.x, p.y);
+                ctx.stroke();
             } else if (currentTool === 'spray') {
                 for (let i = 0; i < 10; i++) {
                     let offsetX = (Math.random() - 0.5) * ctx.lineWidth * 2;
@@ -356,7 +530,9 @@
             } else if (currentTool === 'circle') {
                 ctx.putImageData(savedImageData, 0, 0);
                 let radius = Math.hypot(p.x - startX, p.y - startY);
-                ctx.beginPath(); ctx.arc(startX, startY, radius, 0, Math.PI * 2); ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(startX, startY, radius, 0, Math.PI * 2);
+                ctx.stroke();
             }
         }
 
@@ -364,133 +540,218 @@
             if (!hasMoved && ['brush', 'marker', 'spray', 'eraser'].includes(currentTool)) {
                 ctx.globalAlpha = currentTool === 'marker' ? 0.3 : 1.0;
                 ctx.fillStyle = currentTool === 'eraser' ? DEFAULT_BG_COLOR : currentColor;
-                ctx.beginPath(); ctx.arc(startX, startY, document.getElementById('size-slider').value / 2, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath();
+                ctx.arc(startX, startY, document.getElementById('size-slider').value / 2, 0, Math.PI * 2);
+                ctx.fill();
             }
-            ctx.globalAlpha = 1.0; saveState(); drawing = false; 
+
+            ctx.globalAlpha = 1.0;
+            saveState();
+            drawing = false;
         }
 
-        // --- СОБЫТИЯ ТАЧСКРИНА ---
-        canvas.addEventListener('touchstart', (e) => { 
-            if(e.target.closest('.toolbar, .top-bar')) return;
-            e.preventDefault(); 
+        canvas.addEventListener('touchstart', (e) => {
+            if (!isHost) return;
+            if (e.target.closest('.toolbar, .top-bar')) return;
+
+            e.preventDefault();
+
             if (e.touches.length === 2) {
                 drawing = false;
-                initialPinchDistance = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-                initialPinchCenter = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
-                startScale = currentScale; startTranslateX = translateX; startTranslateY = translateY;
+                initialPinchDistance = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                initialPinchCenter = {
+                    x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                    y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+                };
+                startScale = currentScale;
+                startTranslateX = translateX;
+                startTranslateY = translateY;
                 return;
             }
+
             if (e.touches.length === 1) {
-                drawing = true; hasMoved = false;
+                drawing = true;
+                hasMoved = false;
                 startDrawingLogic(getPos(e));
             }
-        }, {passive: false});
+        }, { passive: false });
 
-        canvas.addEventListener('touchmove', (e) => { 
-            e.preventDefault(); 
+        canvas.addEventListener('touchmove', (e) => {
+            if (!isHost) return;
+
+            e.preventDefault();
+
             if (e.touches.length === 2 && initialPinchDistance) {
-                const currentDistance = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-                const currentCenter = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
+                const currentDistance = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                const currentCenter = {
+                    x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                    y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+                };
+
                 const deltaScale = currentDistance / initialPinchDistance;
                 currentScale = Math.max(1, Math.min(startScale * deltaScale, 4));
                 translateX = startTranslateX + (currentCenter.x - initialPinchCenter.x);
                 translateY = startTranslateY + (currentCenter.y - initialPinchCenter.y);
-                if (currentScale === 1) { translateX = 0; translateY = 0; }
+
+                if (currentScale === 1) {
+                    translateX = 0;
+                    translateY = 0;
+                }
+
                 canvas.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
                 return;
             }
-            if(drawing && e.touches.length === 1) { 
+
+            if (drawing && e.touches.length === 1) {
                 hasMoved = true;
                 moveDrawingLogic(getPos(e));
             }
-        }, {passive: false});
+        }, { passive: false });
 
-        canvas.addEventListener('touchend', (e) => { 
-            if (e.touches.length < 2) { initialPinchDistance = null; initialPinchCenter = null; }
-            if(drawing && e.touches.length === 0) { 
+        canvas.addEventListener('touchend', (e) => {
+            if (!isHost) return;
+
+            if (e.touches.length < 2) {
+                initialPinchDistance = null;
+                initialPinchCenter = null;
+            }
+
+            if (drawing && e.touches.length === 0) {
                 endDrawingLogic();
             }
         });
 
-        // --- СОБЫТИЯ МЫШИ (ДЛЯ ПК) ---
         canvas.addEventListener('mousedown', (e) => {
-            if(e.target.closest('.toolbar, .top-bar')) return;
-            drawing = true; hasMoved = false;
+            if (!isHost) return;
+            if (e.target.closest('.toolbar, .top-bar')) return;
+            drawing = true;
+            hasMoved = false;
             startDrawingLogic(getPos(e));
         });
 
         canvas.addEventListener('mousemove', (e) => {
-            if(!drawing) return;
+            if (!isHost) return;
+            if (!drawing) return;
             hasMoved = true;
             moveDrawingLogic(getPos(e));
         });
 
         const handleMouseUpLeave = () => {
-            if(drawing) endDrawingLogic();
+            if (!isHost) return;
+            if (drawing) endDrawingLogic();
         };
 
         canvas.addEventListener('mouseup', handleMouseUpLeave);
         canvas.addEventListener('mouseleave', handleMouseUpLeave);
 
-        function clearCanvas() { ctx.fillStyle = "#ffffff"; ctx.fillRect(0,0,canvas.width,canvas.height); saveState(); }
-
         function sendFrameToServer() {
-            if (!chatId) return;
+            if (!gameId || !isHost) return;
+
             canvas.toBlob((blob) => {
+                if (!blob) return;
+
                 const formData = new FormData();
                 formData.append('image', blob, 'drawing.png');
-                formData.append('chat_id', chatId);
+                formData.append('chat_id', gameId);
+
                 fetch('https://krizisphone.fun/croc_upload', {
-                    method: 'POST', body: formData, mode: 'cors'
-                }).catch(e => console.log("Сбой отправки кадра", e));
+                    method: 'POST',
+                    body: formData,
+                    mode: 'cors'
+                }).catch(e => console.log('Сбой отправки кадра', e));
             }, 'image/png');
         }
 
+        function renderChatMessages(messages) {
+            chatBox.innerHTML = '';
+
+            if (!messages || messages.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'chat-msg';
+                empty.style.color = '#8e8e93';
+                empty.style.fontStyle = 'italic';
+                empty.textContent = 'Ждем догадки игроков...';
+                chatBox.appendChild(empty);
+                return;
+            }
+
+            messages.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = 'chat-msg';
+
+                const author = document.createElement('span');
+                author.className = 'chat-author';
+                author.textContent = `${msg.name}:`;
+
+                const text = document.createElement('span');
+                text.textContent = msg.text || '';
+
+                div.appendChild(author);
+                div.appendChild(text);
+                chatBox.appendChild(div);
+            });
+
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
         function fetchUpdate() {
-            if (!chatId) return;
-            fetch(`https://krizisphone.fun/croc_get_chat?chat_id=${chatId}`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.host_id && userId && String(data.host_id) !== String(userId)) {
-                    document.getElementById('not-host-screen').style.display = 'flex';
-                    return; 
-                } else {
-                    document.getElementById('not-host-screen').style.display = 'none';
-                }
+            if (!gameId) return;
 
-                if (data.word) document.getElementById('task-text').innerText = data.word;
+            fetch(`https://krizisphone.fun/croc_get_chat?chat_id=${encodeURIComponent(gameId)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.host_id && userId && String(data.host_id) !== String(userId)) {
+                        setHostMode(false);
+                    } else {
+                        setHostMode(true);
+                    }
 
-                const chatBox = document.getElementById('chat-box');
-                chatBox.innerHTML = '';
-                if (data.messages && data.messages.length > 0) {
-                    data.messages.forEach(msg => {
-                        const div = document.createElement('div');
-                        div.className = 'chat-msg';
-                        div.innerHTML = `<span class="chat-author">${msg.name}:</span>${msg.text}`;
-                        chatBox.appendChild(div);
-                    });
-                    chatBox.scrollTop = chatBox.scrollHeight;
-                } else {
-                    chatBox.innerHTML = '<div class="chat-msg" style="color: #8e8e93; font-style: italic;">Ждем догадки игроков...</div>';
-                }
-            }).catch(e => console.log("Сбой обновления", e));
+                    if (data.word) {
+                        taskText.innerText = data.word;
+                    } else {
+                        taskText.innerText = 'Ожидание слова...';
+                    }
+
+                    renderChatMessages(data.messages || []);
+                })
+                .catch(e => {
+                    console.log('Сбой обновления', e);
+                });
         }
 
         function requestNewWord() {
-            if (!chatId) { alert("Ошибка: нет ID чата"); return; }
-            fetch(`https://krizisphone.fun/croc_change_word?chat_id=${chatId}`)
-            .then(res => res.json())
-            .then(data => {
-                if(data.new_word) {
-                    document.getElementById('task-text').innerText = data.new_word;
-                    clearCanvas();
-                }
-            }).catch(e => alert("Не удалось связаться с сервером"));
+            if (!gameId) {
+                alert('Ошибка: нет ID игры');
+                return;
+            }
+
+            if (!isHost) return;
+
+            fetch(`https://krizisphone.fun/croc_change_word?chat_id=${encodeURIComponent(gameId)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.new_word) {
+                        taskText.innerText = data.new_word;
+                        clearCanvas();
+                    }
+                })
+                .catch(() => alert('Не удалось связаться с сервером'));
         }
 
         function startNetworkTasks() {
-            setInterval(sendFrameToServer, 6000); 
-            setInterval(fetchUpdate, 2000);        
+            fetchUpdate();
+
+            if (updateTimer) clearInterval(updateTimer);
+            if (frameTimer) clearInterval(frameTimer);
+
+            updateTimer = setInterval(fetchUpdate, 2000);
+            frameTimer = setInterval(sendFrameToServer, 6000);
         }
 
         init();
