@@ -132,7 +132,7 @@
             height: 20px;
             fill: none;
             stroke: currentColor;
-            stroke-width: 2.2;
+            stroke-width: 2.15;
             stroke-linecap: round;
             stroke-linejoin: round;
         }
@@ -384,19 +384,26 @@
             justify-content: center;
             cursor: pointer;
             flex-shrink: 0;
+            color: var(--text-color);
+        }
+
+        .action-btn:disabled {
+            opacity: 0.45;
+            cursor: default;
         }
 
         #clear-btn { color: var(--danger-color); }
-        #undo-btn { color: var(--accent-color); }
+        #undo-btn, #redo-btn { color: var(--accent-color); }
 
         .icon {
             width: 20px;
             height: 20px;
             fill: none;
             stroke: currentColor;
-            stroke-width: 2.5;
+            stroke-width: 2.35;
             stroke-linecap: round;
             stroke-linejoin: round;
+            shape-rendering: geometricPrecision;
         }
 
         #not-host-screen, #error-screen {
@@ -556,18 +563,22 @@
         </div>
         <div class="top-controls">
             <button class="compact-btn secondary" id="free-word-btn" onclick="requestFreeWord()" title="Бесплатная замена">
-                <svg viewBox="0 0 24 24">
-                    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
-                    <polyline points="21 3 21 8 16 8"></polyline>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M21 12a9 9 0 0 1-15.36 6.36"></path>
+                    <polyline points="3 16 5.64 18.36 8 16"></polyline>
+                    <path d="M3 12a9 9 0 0 1 15.36-6.36"></path>
+                    <polyline points="21 8 18.36 5.64 16 8"></polyline>
                 </svg>
             </button>
 
             <button class="compact-btn" id="paid-word-btn" onclick="openCustomWordModal()" title="Свое слово">
-                <svg viewBox="0 0 24 24">
-                    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
-                    <polyline points="21 3 21 8 16 8"></polyline>
-                    <path d="M12 7v10"></path>
-                    <path d="M15 9.5c0-1.1-1.34-2-3-2s-3 .9-3 2 1.34 2 3 2 3 .9 3 2-1.34 2-3 2-3-.9-3-2"></path>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M21 12a9 9 0 0 1-15.36 6.36"></path>
+                    <polyline points="3 16 5.64 18.36 8 16"></polyline>
+                    <path d="M3 12a9 9 0 0 1 15.36-6.36"></path>
+                    <polyline points="21 8 18.36 5.64 16 8"></polyline>
+                    <path d="M12 8v8"></path>
+                    <path d="M14.25 10.25c0-1.1-1.01-2-2.25-2s-2.25.9-2.25 2 1.01 2 2.25 2 2.25.9 2.25 2-1.01 2-2.25 2-2.25-.9-2.25-2"></path>
                 </svg>
             </button>
 
@@ -603,8 +614,30 @@
 
         <div class="size-row">
             <input type="range" id="size-slider" min="2" max="35" value="7">
-            <button class="action-btn" id="undo-btn" onclick="undo()"><svg class="icon" viewBox="0 0 24 24"><path d="M3 10h10a5 5 0 0 1 5 5 5 5 0 0 1-5 5H3m4-6-4-4 4-4"/></svg></button>
-            <button class="action-btn" id="clear-btn" onclick="clearCanvas()"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"/></svg></button>
+
+            <button class="action-btn" id="clear-btn" onclick="clearCanvas()" title="Очистить">
+                <svg class="icon" viewBox="0 0 24 24">
+                    <path d="M4 7h16"></path>
+                    <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+                    <path d="M7 7l1 12a1 1 0 0 0 1 .9h6a1 1 0 0 0 1-.9L17 7"></path>
+                    <path d="M10 11v5"></path>
+                    <path d="M14 11v5"></path>
+                </svg>
+            </button>
+
+            <button class="action-btn" id="redo-btn" onclick="redo()" title="Вперед" disabled>
+                <svg class="icon" viewBox="0 0 24 24">
+                    <path d="M21 10H11a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10"></path>
+                    <path d="M17 6l4 4-4 4"></path>
+                </svg>
+            </button>
+
+            <button class="action-btn" id="undo-btn" onclick="undo()" title="Назад" disabled>
+                <svg class="icon" viewBox="0 0 24 24">
+                    <path d="M3 10h10a5 5 0 0 1 5 5 5 5 0 0 1-5 5H3"></path>
+                    <path d="M7 6l-4 4 4 4"></path>
+                </svg>
+            </button>
         </div>
     </div>
 
@@ -612,6 +645,14 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
         tg.ready();
+
+        if (typeof tg.enableClosingConfirmation === 'function') {
+            tg.enableClosingConfirmation();
+        }
+
+        if (typeof tg.disableVerticalSwipes === 'function') {
+            tg.disableVerticalSwipes();
+        }
 
         const gameId = tg.initDataUnsafe?.start_param || "";
         const userId = tg.initDataUnsafe?.user ? tg.initDataUnsafe.user.id : null;
@@ -631,9 +672,12 @@
         const customWordModal = document.getElementById('custom-word-modal');
         const customWordInput = document.getElementById('custom-word-input');
         const customWordPriceText = document.getElementById('custom-word-price-text');
+        const undoBtn = document.getElementById('undo-btn');
+        const redoBtn = document.getElementById('redo-btn');
 
         let drawing = false;
         let history = [];
+        let redoHistory = [];
         let currentColor = '#000000';
         let currentTool = 'brush';
         let startX = 0;
@@ -658,7 +702,11 @@
         let currencyName = 'Очки';
         let customWordCost = 15;
         let currentBalance = 0;
-        let autoFreeWordRequested = false;
+
+        function updateHistoryButtons() {
+            undoBtn.disabled = history.length <= 1;
+            redoBtn.disabled = redoHistory.length === 0;
+        }
 
         function showError(text) {
             errorText.textContent = text;
@@ -776,7 +824,7 @@
             ctx.fillStyle = DEFAULT_BG_COLOR;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            saveState();
+            saveState(true);
 
             const colors = ['#000000', '#7f7f7f', '#8B4513', '#ff3b30', '#FF69B4', '#ff9500', '#ffcc00', '#34c759', '#006400', '#008080', '#007aff', '#00008B', '#5856d6', '#8e44ad', '#c8a2c8', '#ffffff'];
 
@@ -801,29 +849,58 @@
             startNetworkTasks();
         }
 
-        function saveState() {
+        function saveState(isInitial = false) {
             if (history.length > 20) history.shift();
             history.push(canvas.toDataURL());
+
+            if (!isInitial) {
+                redoHistory = [];
+            }
+
+            updateHistoryButtons();
+        }
+
+        function restoreFromDataUrl(dataUrl, pushToHistory = false) {
+            const img = new Image();
+            img.src = dataUrl;
+            img.onload = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(
+                    img,
+                    0,
+                    0,
+                    canvas.width / (window.devicePixelRatio || 1),
+                    canvas.height / (window.devicePixelRatio || 1)
+                );
+
+                if (pushToHistory) {
+                    saveState();
+                } else {
+                    updateHistoryButtons();
+                }
+            };
         }
 
         function undo() {
             if (!isHost) return;
 
             if (history.length > 1) {
-                history.pop();
-                const img = new Image();
-                img.src = history[history.length - 1];
-                img.onload = () => {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(
-                        img,
-                        0,
-                        0,
-                        canvas.width / (window.devicePixelRatio || 1),
-                        canvas.height / (window.devicePixelRatio || 1)
-                    );
-                };
+                const currentState = history.pop();
+                redoHistory.push(currentState);
+                restoreFromDataUrl(history[history.length - 1], false);
             }
+
+            updateHistoryButtons();
+        }
+
+        function redo() {
+            if (!isHost) return;
+            if (redoHistory.length === 0) return;
+
+            const nextState = redoHistory.pop();
+            history.push(nextState);
+            restoreFromDataUrl(nextState, false);
+            updateHistoryButtons();
         }
 
         function clearCanvas() {
@@ -1220,11 +1297,13 @@
         }
 
         function maybeAutoRequestFreeWord(data) {
-            if (autoFreeWordRequested) return;
             if (!isHost) return;
             if (!data || !data.word) return;
 
-            autoFreeWordRequested = true;
+            const key = `croco_auto_free_done_${gameId}`;
+            if (localStorage.getItem(key) === '1') return;
+
+            localStorage.setItem(key, '1');
             requestFreeWord(true);
         }
 
