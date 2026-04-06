@@ -75,22 +75,12 @@
         }
 
         .task-text {
-            white-space: normal;
-            word-break: break-word;
             font-size: 17px;
             font-weight: 700;
             line-height: 1.15;
-            display: -webkit-box;
-            -webkit-line-clamp: 1;
-            -webkit-box-orient: vertical;
+            white-space: normal;
+            word-break: break-word;
             overflow: hidden;
-        }
-
-        .task-balance {
-            font-size: 12px;
-            color: var(--muted-color);
-            margin-top: 3px;
-            line-height: 1.1;
         }
 
         .top-controls {
@@ -134,7 +124,7 @@
             height: 20px;
             fill: none;
             stroke: currentColor;
-            stroke-width: 2.15;
+            stroke-width: 2;
             stroke-linecap: round;
             stroke-linejoin: round;
         }
@@ -408,7 +398,7 @@
             shape-rendering: geometricPrecision;
         }
 
-        #not-host-screen, #error-screen {
+        #not-host-screen, #error-screen, #round-finished-screen {
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
@@ -425,6 +415,7 @@
         }
 
         #error-screen { z-index: 10000; }
+        #round-finished-screen { z-index: 9998; }
 
         .lock-icon {
             width: 64px;
@@ -433,7 +424,7 @@
             color: var(--accent-color);
         }
 
-        .lock-title, .error-title {
+        .lock-title, .error-title, .round-finished-title {
             font-size: 24px;
             font-weight: bold;
             margin-bottom: 10px;
@@ -441,11 +432,21 @@
 
         .error-title { color: var(--danger-color); }
 
-        .lock-text, .error-text {
+        .lock-text, .error-text, .round-finished-text {
             font-size: 16px;
             color: var(--muted-color);
             line-height: 1.4;
             max-width: 320px;
+        }
+
+        .round-finished-title {
+            font-size: 28px;
+            margin-bottom: 12px;
+        }
+
+        .round-finished-text {
+            font-size: 18px;
+            margin-bottom: 20px;
         }
 
         .disabled-ui {
@@ -511,7 +512,7 @@
             gap: 10px;
         }
 
-        .modal-btn {
+        .modal-btn, .primary-btn {
             flex: 1;
             border: 1px solid var(--border-color);
             border-radius: 12px;
@@ -523,7 +524,7 @@
             color: var(--text-color);
         }
 
-        .modal-btn.confirm {
+        .modal-btn.confirm, .primary-btn {
             background: var(--accent-color);
             color: #fff;
             border-color: transparent;
@@ -534,6 +535,12 @@
     <div id="error-screen">
         <div class="error-title">Ошибка запуска</div>
         <div class="error-text" id="error-text">Не удалось получить данные игры.</div>
+    </div>
+
+    <div id="round-finished-screen">
+        <div class="round-finished-title">Слово угадано</div>
+        <div class="round-finished-text" id="round-finished-text">Игрок отгадал слово</div>
+        <button id="go-to-chat-btn" class="primary-btn" style="max-width:260px;">Перейти в чат</button>
     </div>
 
     <div id="not-host-screen">
@@ -561,7 +568,6 @@
         <div class="task-wrapper">
             <div class="task-label">Рисуй:</div>
             <div class="task-text" id="task-text">Загрузка...</div>
-            
         </div>
         <div class="top-controls">
             <button class="compact-btn secondary" id="free-word-btn" onclick="requestFreeWord()" title="Бесплатная замена">
@@ -578,7 +584,7 @@
                     <path d="M21 12a9 9 0 0 1-15 6"></path>
                     <polyline points="6 18 6 12 12 12"></polyline>
                     <path d="M3 12a9 9 0 0 1 15-6"></path>
-                    <polyline points="18 6 18 12 12 12"></polyline> 
+                    <polyline points="18 6 18 12 12 12"></polyline>
                     <circle cx="12" cy="12" r="2"></circle>
                 </svg>
             </button>
@@ -619,8 +625,8 @@
             <button class="action-btn" id="clear-btn" onclick="clearCanvas()" title="Очистить">
                 <svg class="icon" viewBox="0 0 24 24">
                     <path d="M3 6h18"></path>
-                    <path d="M8 6v-2h8v2"></path>
-                    <path d="M19 6l-1 14H6L5 6"></path>
+                    <path d="M8 6V4h8v2"></path>
+                    <path d="M6 6l1 14h10l1-14"></path>
                     <path d="M10 11v6"></path>
                     <path d="M14 11v6"></path>
                 </svg>
@@ -665,9 +671,11 @@
         const notHostScreen = document.getElementById('not-host-screen');
         const errorScreen = document.getElementById('error-screen');
         const errorText = document.getElementById('error-text');
+        const roundFinishedScreen = document.getElementById('round-finished-screen');
+        const roundFinishedText = document.getElementById('round-finished-text');
+        const goToChatBtn = document.getElementById('go-to-chat-btn');
         const chatBox = document.getElementById('chat-box');
         const taskText = document.getElementById('task-text');
-        const taskBalance = document.getElementById('task-balance');
         const freeWordBtn = document.getElementById('free-word-btn');
         const paidWordBtn = document.getElementById('paid-word-btn');
         const customWordModal = document.getElementById('custom-word-modal');
@@ -699,10 +707,15 @@
         let isHost = true;
         let updateTimer = null;
         let frameTimer = null;
+        let closeTimer = null;
+        let roundFinishedShown = false;
 
         let currencyName = 'Очки';
         let customWordCost = 15;
-        let currentBalance = 0;
+
+        goToChatBtn.onclick = () => {
+            tg.close();
+        };
 
         function updateHistoryButtons() {
             undoBtn.disabled = history.length <= 1;
@@ -737,6 +750,27 @@
                 drawing = false;
                 closeCustomWordModal();
             }
+        }
+
+        function showRoundFinished(winnerName, guessedWord) {
+            if (roundFinishedShown) return;
+
+            roundFinishedShown = true;
+            roundFinishedText.innerText = `${winnerName} отгадал слово ${guessedWord}`;
+            roundFinishedScreen.style.display = 'flex';
+
+            topBar.classList.add('disabled-ui');
+            toolbar.classList.add('disabled-ui');
+            chatBox.classList.add('disabled-ui');
+            canvas.style.pointerEvents = 'none';
+
+            if (updateTimer) clearInterval(updateTimer);
+            if (frameTimer) clearInterval(frameTimer);
+            if (closeTimer) clearTimeout(closeTimer);
+
+            closeTimer = setTimeout(() => {
+                tg.close();
+            }, 3000);
         }
 
         function applyTheme(theme) {
@@ -861,7 +895,7 @@
             updateHistoryButtons();
         }
 
-        function restoreFromDataUrl(dataUrl, pushToHistory = false) {
+        function restoreFromDataUrl(dataUrl) {
             const img = new Image();
             img.src = dataUrl;
             img.onload = () => {
@@ -873,12 +907,7 @@
                     canvas.width / (window.devicePixelRatio || 1),
                     canvas.height / (window.devicePixelRatio || 1)
                 );
-
-                if (pushToHistory) {
-                    saveState();
-                } else {
-                    updateHistoryButtons();
-                }
+                updateHistoryButtons();
             };
         }
 
@@ -888,7 +917,7 @@
             if (history.length > 1) {
                 const currentState = history.pop();
                 redoHistory.push(currentState);
-                restoreFromDataUrl(history[history.length - 1], false);
+                restoreFromDataUrl(history[history.length - 1]);
             }
 
             updateHistoryButtons();
@@ -900,7 +929,7 @@
 
             const nextState = redoHistory.pop();
             history.push(nextState);
-            restoreFromDataUrl(nextState, false);
+            restoreFromDataUrl(nextState);
             updateHistoryButtons();
         }
 
@@ -1107,11 +1136,8 @@
                     taskText.innerText = data.word;
                 }
 
-                currentBalance = Number(data.balance || 0);
                 currencyName = data.currency_name || currencyName;
                 customWordCost = Number(data.custom_word_cost || customWordCost);
-
-                taskBalance.innerText = `Баланс: ${currentBalance} ${currencyName}`;
                 customWordPriceText.innerText = `Введите слово. Это спишет ${customWordCost} ${currencyName}.`;
 
                 clearCanvas();
@@ -1222,7 +1248,7 @@
         canvas.addEventListener('mouseleave', handleMouseUpLeave);
 
         function sendFrameToServer() {
-            if (!gameId || !isHost) return;
+            if (!gameId || !isHost || roundFinishedShown) return;
 
             canvas.toBlob((blob) => {
                 if (!blob) return;
@@ -1277,7 +1303,7 @@
                 return;
             }
 
-            if (!isHost) return;
+            if (!isHost || roundFinishedShown) return;
 
             try {
                 const res = await fetch(`https://krizisphone.fun/croc_change_word?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}`);
@@ -1298,6 +1324,7 @@
         }
 
         function maybeAutoRequestFreeWord(data) {
+            if (data.round_finished) return;
             if (!isHost) return;
             if (!data || !data.word) return;
 
@@ -1309,7 +1336,7 @@
         }
 
         function fetchUpdate() {
-            if (!gameId) return;
+            if (!gameId || roundFinishedShown) return;
 
             fetch(`https://krizisphone.fun/croc_get_chat?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}`)
                 .then(res => res.json())
@@ -1328,12 +1355,15 @@
 
                     currencyName = data.currency_name || 'Очки';
                     customWordCost = Number(data.custom_word_cost || 15);
-                    currentBalance = Number(data.balance || 0);
-
-                    taskBalance.innerText = `Баланс: ${currentBalance} ${currencyName}`;
                     customWordPriceText.innerText = `Введите слово. Это спишет ${customWordCost} ${currencyName}.`;
 
                     renderChatMessages(data.messages || []);
+
+                    if (data.round_finished && data.winner_name && data.guessed_word) {
+                        showRoundFinished(data.winner_name, data.guessed_word);
+                        return;
+                    }
+
                     maybeAutoRequestFreeWord(data);
                 })
                 .catch(e => {
