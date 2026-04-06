@@ -51,13 +51,12 @@
         }
 
         .top-bar {
-            padding: 10px 16px;
+            padding: 8px 12px;
             background-color: var(--panel-color);
             border-bottom: 1px solid var(--border-color);
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            gap: 12px;
+            gap: 10px;
             z-index: 10;
         }
 
@@ -76,11 +75,11 @@
         }
 
         .task-text {
-            font-size: 18px;
+            font-size: 17px;
             font-weight: 700;
-            line-height: 1.2;
+            line-height: 1.15;
             display: -webkit-box;
-            -webkit-line-clamp: 2;
+            -webkit-line-clamp: 1;
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
@@ -88,57 +87,59 @@
         .task-balance {
             font-size: 12px;
             color: var(--muted-color);
-            margin-top: 4px;
+            margin-top: 3px;
+            line-height: 1.1;
         }
 
         .top-controls {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             flex-shrink: 0;
         }
 
-        .header-buttons {
-            padding: 10px;
-            background-color: var(--panel-color);
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            gap: 10px;
-        }
-
-        .header-btn {
-            flex: 1;
+        .compact-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
             border: 1px solid var(--border-color);
             background: var(--tool-bg);
             color: var(--text-color);
-            border-radius: 12px;
-            padding: 10px 12px;
-            font-size: 14px;
-            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
             transition: transform 0.15s ease, opacity 0.15s ease;
+            flex-shrink: 0;
+            padding: 0;
         }
 
-        .header-btn:active {
-            transform: scale(0.97);
-        }
-
-        .header-btn.secondary {
+        .compact-btn.secondary {
             background: var(--panel-color);
         }
 
-        .header-btn.paid {
-            background: var(--tool-bg);
+        .compact-btn:active {
+            transform: scale(0.96);
         }
 
-        .header-btn:disabled {
+        .compact-btn:disabled {
             opacity: 0.55;
             cursor: default;
         }
 
+        .compact-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2.2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
         #theme-btn {
-            width: 40px;
-            height: 40px;
+            width: 38px;
+            height: 38px;
             background: none;
             border: 1px solid var(--border-color);
             border-radius: 50%;
@@ -147,11 +148,12 @@
             align-items: center;
             justify-content: center;
             cursor: pointer;
+            flex-shrink: 0;
         }
 
         .theme-icon {
-            width: 20px;
-            height: 20px;
+            width: 19px;
+            height: 19px;
             fill: currentColor;
         }
 
@@ -159,12 +161,13 @@
             flex-grow: 1;
             position: relative;
             background: var(--bg-color);
-            margin: 10px;
+            margin: 8px 10px 10px 10px;
             border-radius: 16px;
             overflow: hidden;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             border: 2px solid var(--border-color);
             box-sizing: border-box;
+            min-height: 0;
         }
 
         canvas {
@@ -177,11 +180,11 @@
         }
 
         .chat-box {
-            height: 72px;
+            height: 68px;
             background: var(--panel-color);
             border: 1px solid var(--border-color);
             border-radius: 12px;
-            margin: 0 10px 10px 10px;
+            margin: 0 10px 8px 10px;
             overflow-y: auto;
             padding: 8px;
             font-size: 14px;
@@ -189,6 +192,7 @@
             flex-direction: column;
             gap: 4px;
             box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
+            flex-shrink: 0;
         }
 
         .chat-msg {
@@ -204,17 +208,18 @@
 
         .toolbar {
             background: var(--panel-color);
-            padding: 15px;
+            padding: 12px;
             border-top: 1px solid var(--border-color);
-            padding-bottom: calc(15px + env(safe-area-inset-bottom));
+            padding-bottom: calc(12px + env(safe-area-inset-bottom));
             position: relative;
+            flex-shrink: 0;
         }
 
         .tools-and-colors {
             display: flex;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 15px;
+            gap: 10px;
+            margin-bottom: 12px;
             position: relative;
         }
 
@@ -230,8 +235,8 @@
         .palette::-webkit-scrollbar { display: none; }
 
         .color-dot {
-            width: 32px;
-            height: 32px;
+            width: 30px;
+            height: 30px;
             border-radius: 50%;
             border: 2px solid transparent;
             flex-shrink: 0;
@@ -247,7 +252,7 @@
 
         .divider {
             width: 2px;
-            height: 28px;
+            height: 26px;
             background-color: var(--border-color);
             flex-shrink: 0;
             border-radius: 1px;
@@ -256,8 +261,8 @@
         .brushes-selector { position: relative; flex-shrink: 0; }
 
         .main-brush-btn {
-            width: 40px;
-            height: 40px;
+            width: 38px;
+            height: 38px;
             border-radius: 12px;
             border: 2px solid var(--border-color);
             background-color: var(--tool-bg);
@@ -339,7 +344,7 @@
         .size-row {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             color: var(--muted-color);
             font-size: 13px;
         }
@@ -369,8 +374,8 @@
         }
 
         .action-btn {
-            width: 40px;
-            height: 40px;
+            width: 38px;
+            height: 38px;
             border-radius: 10px;
             border: 1px solid var(--border-color);
             background: var(--panel-color);
@@ -378,6 +383,7 @@
             align-items: center;
             justify-content: center;
             cursor: pointer;
+            flex-shrink: 0;
         }
 
         #clear-btn { color: var(--danger-color); }
@@ -549,16 +555,27 @@
             <div class="task-balance" id="task-balance">Баланс: 0</div>
         </div>
         <div class="top-controls">
-            <button id="theme-btn">
+            <button class="compact-btn secondary" id="free-word-btn" onclick="requestFreeWord()" title="Бесплатная замена">
+                <svg viewBox="0 0 24 24">
+                    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
+                    <polyline points="21 3 21 8 16 8"></polyline>
+                </svg>
+            </button>
+
+            <button class="compact-btn" id="paid-word-btn" onclick="openCustomWordModal()" title="Свое слово">
+                <svg viewBox="0 0 24 24">
+                    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
+                    <polyline points="21 3 21 8 16 8"></polyline>
+                    <path d="M12 7v10"></path>
+                    <path d="M15 9.5c0-1.1-1.34-2-3-2s-3 .9-3 2 1.34 2 3 2 3 .9 3 2-1.34 2-3 2-3-.9-3-2"></path>
+                </svg>
+            </button>
+
+            <button id="theme-btn" title="Тема">
                 <svg id="sun-icon" class="theme-icon" viewBox="0 0 24 24"><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41M12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10z"/></svg>
                 <svg id="moon-icon" class="theme-icon" viewBox="0 0 24 24" style="display:none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             </button>
         </div>
-    </div>
-
-    <div class="header-buttons">
-        <button class="header-btn secondary" id="free-word-btn" onclick="requestFreeWord()">Бесплатная замена</button>
-        <button class="header-btn paid" id="paid-word-btn" onclick="openCustomWordModal()">Свое слово · 15</button>
     </div>
 
     <div id="canvas-wrapper"><canvas id="canvas"></canvas></div>
@@ -576,7 +593,7 @@
                     <button class="tool-btn active" data-tool="brush"><svg viewBox="0 0 24 24"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></svg></button>
                     <button class="tool-btn" data-tool="marker"><svg viewBox="0 0 24 24"><path d="M12.5 22H18l3-3V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14l3 3h4.5"/><path d="M15 2v4"/><path d="M9 2v4"/><path d="M3 15h18"/></svg></button>
                     <button class="tool-btn" data-tool="spray"><svg viewBox="0 0 24 24"><path d="M8 8h8v14a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V8Z"/><path d="M10 2h4v4h-4z"/><circle cx="12" cy="14" r="1.5"/><path d="M16 6h2"/><path d="M15 4h1"/><path d="M17 8h2"/><path d="M7 6H5"/><path d="M8 4H7"/><path d="M7 8H5"/></svg></button>
-                    <button class="tool-btn eraser-btn" data-tool="eraser"><svg viewBox="0 0 24 24"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 2.5 0 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg></button>
+                    <button class="tool-btn eraser-btn" data-tool="eraser"><svg viewBox="0 0 24 24"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg></button>
                     <button class="tool-btn" data-tool="fill"><svg viewBox="0 0 24 24"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/></svg></button>
                     <button class="tool-btn" data-tool="circle"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg></button>
                     <button class="tool-btn" data-tool="rect"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/></svg></button>
@@ -641,6 +658,7 @@
         let currencyName = 'Очки';
         let customWordCost = 15;
         let currentBalance = 0;
+        let autoFreeWordRequested = false;
 
         function showError(text) {
             errorText.textContent = text;
@@ -658,8 +676,8 @@
                 topBar.classList.remove('disabled-ui');
                 toolbar.classList.remove('disabled-ui');
                 canvas.style.pointerEvents = 'auto';
-                freeWordBtn.style.display = 'block';
-                paidWordBtn.style.display = 'block';
+                freeWordBtn.style.display = 'flex';
+                paidWordBtn.style.display = 'flex';
             } else {
                 notHostScreen.style.display = 'flex';
                 topBar.classList.add('disabled-ui');
@@ -1016,7 +1034,7 @@
                 customWordCost = Number(data.custom_word_cost || customWordCost);
 
                 taskBalance.innerText = `Баланс: ${currentBalance} ${currencyName}`;
-                paidWordBtn.innerText = `Свое слово · ${customWordCost} ${currencyName}`;
+                customWordPriceText.innerText = `Введите слово. Это спишет ${customWordCost} ${currencyName}.`;
 
                 clearCanvas();
                 closeCustomWordModal();
@@ -1027,7 +1045,7 @@
 
         canvas.addEventListener('touchstart', (e) => {
             if (!isHost) return;
-            if (e.target.closest('.toolbar, .top-bar, .header-buttons')) return;
+            if (e.target.closest('.toolbar, .top-bar')) return;
 
             e.preventDefault();
 
@@ -1104,7 +1122,7 @@
 
         canvas.addEventListener('mousedown', (e) => {
             if (!isHost) return;
-            if (e.target.closest('.toolbar, .top-bar, .header-buttons')) return;
+            if (e.target.closest('.toolbar, .top-bar')) return;
             drawing = true;
             hasMoved = false;
             startDrawingLogic(getPos(e));
@@ -1175,6 +1193,41 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
+        async function requestFreeWord(silent = false) {
+            if (!gameId) {
+                if (!silent) alert('Ошибка: нет ID игры');
+                return;
+            }
+
+            if (!isHost) return;
+
+            try {
+                const res = await fetch(`https://krizisphone.fun/croc_change_word?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}`);
+                const data = await res.json();
+
+                if (!res.ok) {
+                    if (!silent) alert(data.error || 'Не удалось сменить слово');
+                    return;
+                }
+
+                if (data.new_word) {
+                    taskText.innerText = data.new_word;
+                    clearCanvas();
+                }
+            } catch (e) {
+                if (!silent) alert('Не удалось связаться с сервером');
+            }
+        }
+
+        function maybeAutoRequestFreeWord(data) {
+            if (autoFreeWordRequested) return;
+            if (!isHost) return;
+            if (!data || !data.word) return;
+
+            autoFreeWordRequested = true;
+            requestFreeWord(true);
+        }
+
         function fetchUpdate() {
             if (!gameId) return;
 
@@ -1198,39 +1251,14 @@
                     currentBalance = Number(data.balance || 0);
 
                     taskBalance.innerText = `Баланс: ${currentBalance} ${currencyName}`;
-                    paidWordBtn.innerText = `Свое слово · ${customWordCost} ${currencyName}`;
                     customWordPriceText.innerText = `Введите слово. Это спишет ${customWordCost} ${currencyName}.`;
 
                     renderChatMessages(data.messages || []);
+                    maybeAutoRequestFreeWord(data);
                 })
                 .catch(e => {
                     console.log('Сбой обновления', e);
                 });
-        }
-
-        function requestFreeWord() {
-            if (!gameId) {
-                alert('Ошибка: нет ID игры');
-                return;
-            }
-
-            if (!isHost) return;
-
-            fetch(`https://krizisphone.fun/croc_change_word?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}`)
-                .then(async res => {
-                    const data = await res.json();
-
-                    if (!res.ok) {
-                        alert(data.error || 'Не удалось сменить слово');
-                        return;
-                    }
-
-                    if (data.new_word) {
-                        taskText.innerText = data.new_word;
-                        clearCanvas();
-                    }
-                })
-                .catch(() => alert('Не удалось связаться с сервером'));
         }
 
         function startNetworkTasks() {
