@@ -75,6 +75,8 @@
         }
 
         .task-text {
+            white-space: normal;
+            word-break: break-word;
             font-size: 17px;
             font-weight: 700;
             line-height: 1.15;
@@ -559,26 +561,21 @@
         <div class="task-wrapper">
             <div class="task-label">Рисуй:</div>
             <div class="task-text" id="task-text">Загрузка...</div>
-            <div class="task-balance" id="task-balance">Баланс: 0</div>
+            
         </div>
         <div class="top-controls">
             <button class="compact-btn secondary" id="free-word-btn" onclick="requestFreeWord()" title="Бесплатная замена">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M21 12a9 9 0 0 1-15.36 6.36"></path>
-                    <polyline points="3 16 5.64 18.36 8 16"></polyline>
-                    <path d="M3 12a9 9 0 0 1 15.36-6.36"></path>
-                    <polyline points="21 8 18.36 5.64 16 8"></polyline>
+                <svg viewBox="0 0 24 24">
+                    <path d="M3 12a9 9 0 0 1 15-6l3 3"></path>
+                    <path d="M21 12a9 9 0 0 1-15 6l-3-3"></path>
                 </svg>
             </button>
 
             <button class="compact-btn" id="paid-word-btn" onclick="openCustomWordModal()" title="Свое слово">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M21 12a9 9 0 0 1-15.36 6.36"></path>
-                    <polyline points="3 16 5.64 18.36 8 16"></polyline>
-                    <path d="M3 12a9 9 0 0 1 15.36-6.36"></path>
-                    <polyline points="21 8 18.36 5.64 16 8"></polyline>
-                    <path d="M12 8v8"></path>
-                    <path d="M14.25 10.25c0-1.1-1.01-2-2.25-2s-2.25.9-2.25 2 1.01 2 2.25 2 2.25.9 2.25 2-1.01 2-2.25 2-2.25-.9-2.25-2"></path>
+                <svg viewBox="0 0 24 24">
+                    <path d="M3 12a9 9 0 0 1 15-6l3 3"></path>
+                    <path d="M21 12a9 9 0 0 1-15 6l-3-3"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
                 </svg>
             </button>
 
@@ -617,11 +614,11 @@
 
             <button class="action-btn" id="clear-btn" onclick="clearCanvas()" title="Очистить">
                 <svg class="icon" viewBox="0 0 24 24">
-                    <path d="M4 7h16"></path>
-                    <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
-                    <path d="M7 7l1 12a1 1 0 0 0 1 .9h6a1 1 0 0 0 1-.9L17 7"></path>
-                    <path d="M10 11v5"></path>
-                    <path d="M14 11v5"></path>
+                    <path d="M3 6h18"></path>
+                    <path d="M8 6v-2h8v2"></path>
+                    <path d="M19 6l-1 14H6L5 6"></path>
+                    <path d="M10 11v6"></path>
+                    <path d="M14 11v6"></path>
                 </svg>
             </button>
 
