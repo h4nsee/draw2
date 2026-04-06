@@ -124,9 +124,13 @@
             height: 20px;
             fill: none;
             stroke: currentColor;
-            stroke-width: 2;
+            stroke-width: 2.2;
             stroke-linecap: round;
             stroke-linejoin: round;
+        }
+
+        .word-change-icon {
+            overflow: visible;
         }
 
         #theme-btn {
@@ -529,6 +533,20 @@
             color: #fff;
             border-color: transparent;
         }
+
+        #go-to-chat-btn {
+            flex: 0 0 auto;
+            width: auto;
+            min-width: 220px;
+            max-width: 260px;
+            align-self: center;
+            padding: 14px 22px;
+            line-height: 1.2;
+            font-size: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
     </style>
 </head>
 <body>
@@ -540,7 +558,7 @@
     <div id="round-finished-screen">
         <div class="round-finished-title">Слово угадано</div>
         <div class="round-finished-text" id="round-finished-text">Игрок отгадал слово</div>
-        <button id="go-to-chat-btn" class="primary-btn" style="max-width:260px;">Перейти в чат</button>
+        <button id="go-to-chat-btn" class="primary-btn">Перейти в чат</button>
     </div>
 
     <div id="not-host-screen">
@@ -571,21 +589,25 @@
         </div>
         <div class="top-controls">
             <button class="compact-btn secondary" id="free-word-btn" onclick="requestFreeWord()" title="Бесплатная замена">
-                <svg viewBox="0 0 24 24">
-                    <path d="M21 12a9 9 0 0 1-15 6"></path>
-                    <polyline points="6 18 6 12 12 12"></polyline>
-                    <path d="M3 12a9 9 0 0 1 15-6"></path>
-                    <polyline points="18 6 18 12 12 12"></polyline>
+                <svg class="word-change-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M7.5 7A7 7 0 0 1 19 9"></path>
+                    <path d="M19 9V4.8"></path>
+                    <path d="M19 9h-4.2"></path>
+                    <path d="M16.5 17A7 7 0 0 1 5 15"></path>
+                    <path d="M5 15v4.2"></path>
+                    <path d="M5 15h4.2"></path>
                 </svg>
             </button>
 
             <button class="compact-btn" id="paid-word-btn" onclick="openCustomWordModal()" title="Свое слово">
-                <svg viewBox="0 0 24 24">
-                    <path d="M21 12a9 9 0 0 1-15 6"></path>
-                    <polyline points="6 18 6 12 12 12"></polyline>
-                    <path d="M3 12a9 9 0 0 1 15-6"></path>
-                    <polyline points="18 6 18 12 12 12"></polyline>
-                    <circle cx="12" cy="12" r="2"></circle>
+                <svg class="word-change-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M7.5 7A7 7 0 0 1 19 9"></path>
+                    <path d="M19 9V4.8"></path>
+                    <path d="M19 9h-4.2"></path>
+                    <path d="M16.5 17A7 7 0 0 1 5 15"></path>
+                    <path d="M5 15v4.2"></path>
+                    <path d="M5 15h4.2"></path>
+                    <circle cx="12" cy="12" r="2.2"></circle>
                 </svg>
             </button>
 
