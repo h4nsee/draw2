@@ -588,7 +588,14 @@
             <div class="task-text" id="task-text">Загрузка...</div>
         </div>
         <div class="top-controls">
-            <button class="compact-btn secondary" id="free-word-btn" onclick="requestFreeWord()" title="Бесплатная замена">
+            <button class="compact-btn secondary" id="prev-word-btn" onclick="requestPrevWord()" title="Вернуть слово">
+                <svg class="word-change-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M9 7 4 12l5 5"></path>
+                    <path d="M20 12H4"></path>
+                </svg>
+            </button>
+
+            <button class="compact-btn secondary" id="free-word-btn" onclick="requestFreeWord()" title="Сменить слово">
                 <svg class="word-change-icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M7.5 7A7 7 0 0 1 19 9"></path>
                     <path d="M19 9V4.8"></path>
@@ -654,17 +661,17 @@
                 </svg>
             </button>
 
-            <button class="action-btn" id="redo-btn" onclick="redo()" title="Вперед" disabled>
-                <svg class="icon" viewBox="0 0 24 24">
-                    <path d="M21 10H11a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10"></path>
-                    <path d="M17 6l4 4-4 4"></path>
-                </svg>
-            </button>
-
             <button class="action-btn" id="undo-btn" onclick="undo()" title="Назад" disabled>
                 <svg class="icon" viewBox="0 0 24 24">
                     <path d="M3 10h10a5 5 0 0 1 5 5 5 5 0 0 1-5 5H3"></path>
                     <path d="M7 6l-4 4 4 4"></path>
+                </svg>
+            </button>
+
+            <button class="action-btn" id="redo-btn" onclick="redo()" title="Вперед" disabled>
+                <svg class="icon" viewBox="0 0 24 24">
+                    <path d="M21 10H11a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10"></path>
+                    <path d="M17 6l4 4-4 4"></path>
                 </svg>
             </button>
         </div>
@@ -698,6 +705,7 @@
         const goToChatBtn = document.getElementById('go-to-chat-btn');
         const chatBox = document.getElementById('chat-box');
         const taskText = document.getElementById('task-text');
+        const prevWordBtn = document.getElementById('prev-word-btn');
         const freeWordBtn = document.getElementById('free-word-btn');
         const paidWordBtn = document.getElementById('paid-word-btn');
         const customWordModal = document.getElementById('custom-word-modal');
@@ -760,6 +768,7 @@
                 topBar.classList.remove('disabled-ui');
                 toolbar.classList.remove('disabled-ui');
                 canvas.style.pointerEvents = 'auto';
+                prevWordBtn.style.display = 'flex';
                 freeWordBtn.style.display = 'flex';
                 paidWordBtn.style.display = 'flex';
             } else {
@@ -767,6 +776,7 @@
                 topBar.classList.add('disabled-ui');
                 toolbar.classList.add('disabled-ui');
                 canvas.style.pointerEvents = 'none';
+                prevWordBtn.style.display = 'none';
                 freeWordBtn.style.display = 'none';
                 paidWordBtn.style.display = 'none';
                 drawing = false;
@@ -883,7 +893,7 @@
 
             saveState(true);
 
-            const colors = ['#000000', '#7f7f7f', '#8B4513', '#ff3b30', '#FF69B4', '#ff9500', '#ffcc00', '#34c759', '#006400', '#008080', '#007aff', '#00008B', '#5856d6', '#8e44ad', '#c8a2c8', '#ffffff'];
+            const colors = ['#000000', '#7f7f7f', '#8B4513', '#F5F5DC', '#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#006400', '#008080', '#007aff', '#00008B', '#5856d6', '#8e44ad', '#c8a2c8', '#FF69B4', '#ffffff'];
 
             colors.forEach(c => {
                 const dot = document.createElement('div');
@@ -1154,8 +1164,8 @@
                     return;
                 }
 
-                if (data.word) {
-                    taskText.innerText = data.word;
+                if (data.new_word) {
+                    taskText.innerText = data.new_word;
                 }
 
                 currencyName = data.currency_name || currencyName;
@@ -1317,6 +1327,33 @@
             });
 
             chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+
+        async function requestPrevWord(silent = false) {
+            if (!gameId) {
+                if (!silent) alert('Ошибка: нет ID игры');
+                return;
+            }
+
+            if (!isHost || roundFinishedShown) return;
+
+            try {
+                const res = await fetch(`https://krizisphone.fun/croc_prev_word?chat_id=${encodeURIComponent(gameId)}`);
+                const data = await res.json();
+
+                if (!res.ok) {
+                    if (!silent) alert(data.error || 'Не удалось вернуть слово');
+                    return;
+                }
+
+                if (data.word) {
+                    taskText.innerText = data.word;
+                    clearCanvas();
+                }
+            } catch (e) {
+                if (!silent) alert('Не удалось связаться с сервером');
+            }
         }
 
         async function requestFreeWord(silent = false) {
