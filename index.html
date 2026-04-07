@@ -742,6 +742,7 @@
 
         let currencyName = 'Очки';
         let customWordCost = 15;
+        let pendingUploadTimer = null;
         const CANVAS_STORAGE_KEY = `croco_canvas_${gameId}`;
 
         goToChatBtn.onclick = () => {
@@ -865,6 +866,7 @@
                 if (skipHistory) {
                     history = [canvas.toDataURL('image/png')];
                     redoHistory = [];
+                    persistCanvasLocally();
                     updateHistoryButtons();
                 }
             };
@@ -985,7 +987,18 @@
             startNetworkTasks();
         }
 
-        function saveState(isInitial = false) {
+        function scheduleImmediateUpload() {
+            if (pendingUploadTimer) {
+                clearTimeout(pendingUploadTimer);
+            }
+
+            pendingUploadTimer = setTimeout(() => {
+                sendFrameToServer();
+                pendingUploadTimer = null;
+            }, 250);
+        }
+
+        function saveState(isInitial = false, persistLocal = true) {
             if (history.length > 20) history.shift();
             history.push(canvas.toDataURL('image/png'));
 
@@ -993,7 +1006,14 @@
                 redoHistory = [];
             }
 
-            persistCanvasLocally();
+            if (persistLocal) {
+                persistCanvasLocally();
+            }
+
+            if (!isInitial) {
+                scheduleImmediateUpload();
+            }
+
             updateHistoryButtons();
         }
 
@@ -1498,6 +1518,18 @@
             updateTimer = setInterval(fetchUpdate, 2000);
             frameTimer = setInterval(sendFrameToServer, 6000);
         }
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                persistCanvasLocally();
+                sendFrameToServer();
+            }
+        });
+
+        window.addEventListener('pagehide', () => {
+            persistCanvasLocally();
+            sendFrameToServer();
+        });
 
         init();
     </script>
