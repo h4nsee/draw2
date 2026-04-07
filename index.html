@@ -1602,17 +1602,6 @@
             }
         }
 
-        function maybeAutoRequestFreeWord(data) {
-            if (data.round_finished) return;
-            if (!isHost) return;
-            if (!data || !data.word) return;
-
-            const key = `croco_auto_free_done_${gameId}`;
-            if (localStorage.getItem(key) === '1') return;
-
-            localStorage.setItem(key, '1');
-            requestFreeWord(true);
-        }
 
         function fetchUpdate() {
             if (!gameId || roundFinishedShown) return;
@@ -1647,7 +1636,6 @@
                         return;
                     }
 
-                    maybeAutoRequestFreeWord(data);
                 })
                 .catch(e => {
                     console.log('Сбой обновления', e);
@@ -1661,7 +1649,7 @@
             if (frameTimer) clearInterval(frameTimer);
 
             updateTimer = setInterval(fetchUpdate, 2000);
-            frameTimer = setInterval(sendFrameToServer, 6000);
+            frameTimer = setInterval(sendFrameToServer, 12000);
         }
 
         function sendFrameWithBeacon() {
