@@ -1550,7 +1550,7 @@
             if (!isHost || roundFinishedShown) return;
 
             try {
-                const res = await fetch(`https://krizisphone.fun/croc_prev_word?chat_id=${encodeURIComponent(gameId)}`);
+                const res = await fetch(`https://krizisphone.fun/croc_prev_word?chat_id=${encodeURIComponent(gameId)}`, { cache: 'no-store' });
                 const data = await parseJsonSafe(res);
 
                 if (!res.ok) {
@@ -1580,7 +1580,7 @@
             if (!isHost || roundFinishedShown) return;
 
             try {
-                const res = await fetch(`https://krizisphone.fun/croc_change_word?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}`);
+                const res = await fetch(`https://krizisphone.fun/croc_change_word?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}`, { cache: 'no-store' });
                 const data = await res.json();
 
                 if (!res.ok) {
@@ -1602,12 +1602,12 @@
         }
 
 
-        function fetchUpdate() {
+        async function fetchUpdate() {
             if (!gameId || roundFinishedShown) return;
 
-            fetch(`https://krizisphone.fun/croc_get_chat?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}`)
-                .then(res => res.json())
-                .then(data => {
+            try {
+                const res = await fetch(`https://krizisphone.fun/croc_get_chat?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}`, { cache: 'no-store' });
+                const data = await res.json();
                     if (data.host_id && userId && String(data.host_id) !== String(userId)) {
                         setHostMode(false);
                     } else {
@@ -1627,18 +1627,16 @@
                     renderChatMessages(data.messages || []);
 
                     if (data.draw_round_id && data.draw_round_id !== currentDrawRoundId) {
-                        applyRoundId(data.draw_round_id, { restoreCanvas: true });
+                        await applyRoundId(data.draw_round_id, { restoreCanvas: true });
                     }
 
                     if (data.round_finished && data.winner_name && data.guessed_word) {
                         showRoundFinished(data.winner_name, data.guessed_word);
                         return;
                     }
-
-                })
-                .catch(e => {
+                } catch (e) {
                     console.log('Сбой обновления', e);
-                });
+                }
         }
 
         function startNetworkTasks() {
