@@ -961,7 +961,7 @@
             if (!gameId) return false;
 
             try {
-                const res = await fetch(`https://krizisphone.fun/croc_get_canvas?chat_id=${encodeURIComponent(gameId)}`, { cache: 'no-store' });
+                const res = await fetch(`https://krizisphone.fun/croc_get_canvas?chat_id=${encodeURIComponent(gameId)}&_=${Date.now()}`, { cache: 'no-store' });
                 if (res.ok) {
                     const blob = await res.blob();
                     const objectUrl = URL.createObjectURL(blob);
@@ -1069,7 +1069,7 @@
                 }
             }
 
-            const restoredOnOpen = await restoreCanvasOnOpen();
+            await restoreCanvasOnOpen();
             if (history.length === 0) {
                 saveState(true);
             } else {
@@ -1554,7 +1554,7 @@
                 const data = await parseJsonSafe(res);
 
                 if (!res.ok) {
-                    if (!silent) alert(data.error || data.raw_text || `Не удалось вернуть слово (${res.status})`);
+                    if (!silent) alert(data.error || data.raw_text || 'Не удалось вернуть слово');
                     return;
                 }
 
@@ -1567,7 +1567,7 @@
                     }
                 }
             } catch (e) {
-                if (!silent) alert(`Не удалось связаться с сервером: ${e && e.message ? e.message : 'ошибка сети'}`);
+                if (!silent) alert('Не удалось связаться с сервером');
             }
         }
 
@@ -1580,7 +1580,7 @@
             if (!isHost || roundFinishedShown) return;
 
             try {
-                const res = await fetch(`https://krizisphone.fun/croc_change_word?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}`, { cache: 'no-store' });
+                const res = await fetch(`https://krizisphone.fun/croc_change_word?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}&_=${Date.now()}`, { cache: 'no-store' });
                 const data = await res.json();
 
                 if (!res.ok) {
@@ -1606,7 +1606,7 @@
             if (!gameId || roundFinishedShown) return;
 
             try {
-                const res = await fetch(`https://krizisphone.fun/croc_get_chat?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}`, { cache: 'no-store' });
+                const res = await fetch(`https://krizisphone.fun/croc_get_chat?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}&_=${Date.now()}`, { cache: 'no-store' });
                 const data = await res.json();
                     if (data.host_id && userId && String(data.host_id) !== String(userId)) {
                         setHostMode(false);
@@ -1646,7 +1646,7 @@
             if (frameTimer) clearInterval(frameTimer);
 
             updateTimer = setInterval(fetchUpdate, 2000);
-            frameTimer = setInterval(sendFrameToServer, 12000);
+            frameTimer = setInterval(sendFrameToServer, 15000);
         }
 
         function sendFrameWithBeacon() {
