@@ -744,7 +744,8 @@
         let customWordCost = 15;
         let canvasRestoring = false;
         let pendingUploadTimer = null;
-        const CANVAS_STORAGE_KEY = `croco_canvas_${gameId}`;
+        let currentDrawRoundId = null;
+        let currentCanvasStorageKey = null;
 
         goToChatBtn.onclick = () => {
             tg.close();
@@ -831,19 +832,42 @@
             localStorage.setItem('user_theme', newTheme);
         };
 
+        function getCanvasStorageKey(roundId = currentDrawRoundId) {
+            if (!gameId || !roundId) return null;
+            return `croco_canvas_${gameId}_${roundId}`;
+        }
+
         function persistCanvasLocally() {
+            const storageKey = getCanvasStorageKey();
+            if (!storageKey) return;
+
             try {
-                localStorage.setItem(CANVAS_STORAGE_KEY, canvas.toDataURL('image/png'));
+                localStorage.setItem(storageKey, canvas.toDataURL('image/png'));
             } catch (e) {
                 console.log('Не удалось сохранить холст локально', e);
             }
         }
 
-        function clearLocalCanvasCache() {
+        function clearLocalCanvasCache(roundId = currentDrawRoundId) {
+            const storageKey = getCanvasStorageKey(roundId);
+            if (!storageKey) return;
+
             try {
-                localStorage.removeItem(CANVAS_STORAGE_KEY);
+                localStorage.removeItem(storageKey);
             } catch (e) {
                 console.log('Не удалось очистить локальный кэш холста', e);
+            }
+        }
+
+        function resetCanvasToBlank(skipHistory = false) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = DEFAULT_BG_COLOR;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (skipHistory) {
+                history = [canvas.toDataURL('image/png')];
+                redoHistory = [];
+                updateHistoryButtons();
             }
         }
 
@@ -887,12 +911,56 @@
             });
         }
 
+        async function fetchInitialGameState() {
+            if (!gameId) return null;
+
+            try {
+                const res = await fetch(`https://krizisphone.fun/croc_get_chat?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}`);
+                if (!res.ok) return null;
+                return await res.json();
+            } catch (e) {
+                console.log('Не удалось получить стартовые данные игры', e);
+                return null;
+            }
+        }
+
+        async function applyRoundId(roundId, options = {}) {
+            const { restoreCanvas = false } = options;
+
+            if (!roundId) return;
+            if (currentDrawRoundId === roundId && currentCanvasStorageKey) return;
+
+            const previousStorageKey = currentCanvasStorageKey;
+            currentDrawRoundId = roundId;
+            currentCanvasStorageKey = getCanvasStorageKey(roundId);
+
+            if (previousStorageKey && previousStorageKey !== currentCanvasStorageKey) {
+                try {
+                    localStorage.removeItem(previousStorageKey);
+                } catch (e) {
+                    console.log('Не удалось очистить старый кэш холста', e);
+                }
+            }
+
+            resetCanvasToBlank(true);
+
+            if (restoreCanvas) {
+                await restoreCanvasOnOpen();
+                if (history.length === 0) {
+                    saveState(true);
+                } else {
+                    updateHistoryButtons();
+                }
+            }
+        }
+
         async function restoreCanvasOnOpen() {
 
             let restored = false;
 
             try {
-                const cached = localStorage.getItem(CANVAS_STORAGE_KEY);
+                const storageKey = getCanvasStorageKey();
+                const cached = storageKey ? localStorage.getItem(storageKey) : null;
                 if (cached) {
                     restored = await restoreCanvasFromDataUrl(cached, true);
                 }
@@ -977,6 +1045,25 @@
             ctx.lineJoin = 'round';
             ctx.fillStyle = DEFAULT_BG_COLOR;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const initialState = await fetchInitialGameState();
+            if (initialState) {
+                if (initialState.host_id && userId && String(initialState.host_id) !== String(userId)) {
+                    setHostMode(false);
+                } else {
+                    setHostMode(true);
+                }
+
+                taskText.innerText = initialState.word || 'Ожидание слова...';
+                currencyName = initialState.currency_name || 'Очки';
+                customWordCost = Number(initialState.custom_word_cost || 15);
+                customWordPriceText.innerText = `Введите слово. Это спишет ${customWordCost} ${currencyName}.`;
+                renderChatMessages(initialState.messages || []);
+
+                if (initialState.draw_round_id) {
+                    await applyRoundId(initialState.draw_round_id);
+                }
+            }
 
             const restoredOnOpen = await restoreCanvasOnOpen();
             if (history.length === 0) {
@@ -1278,6 +1365,10 @@
                     taskText.innerText = data.new_word;
                 }
 
+                if (data.draw_round_id) {
+                    await applyRoundId(data.draw_round_id);
+                }
+
                 currencyName = data.currency_name || currencyName;
                 customWordCost = Number(data.custom_word_cost || customWordCost);
                 customWordPriceText.innerText = `Введите слово. Это спишет ${customWordCost} ${currencyName}.`;
@@ -1470,7 +1561,11 @@
 
                 if (data.word) {
                     taskText.innerText = data.word;
-                    clearCanvas();
+                    if (data.draw_round_id) {
+                        await applyRoundId(data.draw_round_id);
+                    } else {
+                        clearCanvas();
+                    }
                 }
             } catch (e) {
                 if (!silent) alert('Не удалось связаться с сервером');
@@ -1496,7 +1591,11 @@
 
                 if (data.new_word) {
                     taskText.innerText = data.new_word;
-                    clearCanvas();
+                    if (data.draw_round_id) {
+                        await applyRoundId(data.draw_round_id);
+                    } else {
+                        clearCanvas();
+                    }
                 }
             } catch (e) {
                 if (!silent) alert('Не удалось связаться с сервером');
@@ -1538,6 +1637,10 @@
                     customWordPriceText.innerText = `Введите слово. Это спишет ${customWordCost} ${currencyName}.`;
 
                     renderChatMessages(data.messages || []);
+
+                    if (data.draw_round_id && data.draw_round_id !== currentDrawRoundId) {
+                        applyRoundId(data.draw_round_id, { restoreCanvas: true });
+                    }
 
                     if (data.round_finished && data.winner_name && data.guessed_word) {
                         showRoundFinished(data.winner_name, data.guessed_word);
