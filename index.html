@@ -742,6 +742,7 @@
 
         let currencyName = 'Очки';
         let customWordCost = 15;
+        const CANVAS_STORAGE_KEY = `croco_canvas_${gameId}`;
 
         goToChatBtn.onclick = () => {
             tg.close();
@@ -828,6 +829,73 @@
             localStorage.setItem('user_theme', newTheme);
         };
 
+        function persistCanvasLocally() {
+            try {
+                localStorage.setItem(CANVAS_STORAGE_KEY, canvas.toDataURL('image/png'));
+            } catch (e) {
+                console.log('Не удалось сохранить холст локально', e);
+            }
+        }
+
+        function clearLocalCanvasCache() {
+            try {
+                localStorage.removeItem(CANVAS_STORAGE_KEY);
+            } catch (e) {
+                console.log('Не удалось очистить локальный кэш холста', e);
+            }
+        }
+
+        function restoreCanvasFromDataUrl(dataUrl, skipHistory = false) {
+            if (!dataUrl) return;
+
+            const img = new Image();
+            img.src = dataUrl;
+            img.onload = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = DEFAULT_BG_COLOR;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(
+                    img,
+                    0,
+                    0,
+                    canvas.width / (window.devicePixelRatio || 1),
+                    canvas.height / (window.devicePixelRatio || 1)
+                );
+
+                if (skipHistory) {
+                    history = [canvas.toDataURL('image/png')];
+                    redoHistory = [];
+                    updateHistoryButtons();
+                }
+            };
+        }
+
+        async function restoreCanvasOnOpen() {
+            let restored = false;
+
+            try {
+                const cached = localStorage.getItem(CANVAS_STORAGE_KEY);
+                if (cached) {
+                    restoreCanvasFromDataUrl(cached, true);
+                    restored = true;
+                }
+            } catch (e) {
+                console.log('Не удалось прочитать локальный кэш холста', e);
+            }
+
+            if (restored || !gameId) return;
+
+            try {
+                const res = await fetch(`https://krizisphone.fun/croc_get_canvas?chat_id=${encodeURIComponent(gameId)}`);
+                if (!res.ok) return;
+                const blob = await res.blob();
+                const objectUrl = URL.createObjectURL(blob);
+                restoreCanvasFromDataUrl(objectUrl, true);
+            } catch (e) {
+                console.log('Не удалось восстановить холст с сервера', e);
+            }
+        }
+
         function initBrushesSelector() {
             const mainBtn = document.getElementById('main-brush-btn');
             const menu = document.getElementById('brushes-menu');
@@ -892,8 +960,9 @@
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             saveState(true);
+            restoreCanvasOnOpen();
 
-            const colors = ['#000000', '#7f7f7f', '#8B4513', '#F5F5DC', '#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#006400', '#008080', '#007aff', '#00008B', '#5856d6', '#8e44ad', '#c8a2c8', '#FF69B4', '#ffffff'];
+            const colors = ['#000000', '#7f7f7f', '#8B4513', '#F5F5DC', '#E8BEAC', '#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#006400', '#008080', '#007aff', '#00008B', '#5856d6', '#8e44ad', '#c8a2c8', '#FF69B4', '#ffffff'];
 
             colors.forEach(c => {
                 const dot = document.createElement('div');
@@ -918,29 +987,18 @@
 
         function saveState(isInitial = false) {
             if (history.length > 20) history.shift();
-            history.push(canvas.toDataURL());
+            history.push(canvas.toDataURL('image/png'));
 
             if (!isInitial) {
                 redoHistory = [];
             }
 
+            persistCanvasLocally();
             updateHistoryButtons();
         }
 
         function restoreFromDataUrl(dataUrl) {
-            const img = new Image();
-            img.src = dataUrl;
-            img.onload = () => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(
-                    img,
-                    0,
-                    0,
-                    canvas.width / (window.devicePixelRatio || 1),
-                    canvas.height / (window.devicePixelRatio || 1)
-                );
-                updateHistoryButtons();
-            };
+            restoreCanvasFromDataUrl(dataUrl, false);
         }
 
         function undo() {
@@ -969,6 +1027,7 @@
             if (!isHost) return;
             ctx.fillStyle = "#ffffff";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+            clearLocalCanvasCache();
             saveState();
         }
 
