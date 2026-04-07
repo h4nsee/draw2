@@ -1681,7 +1681,22 @@
                 persistCanvasLocally();
                 sendFrameWithBeacon();
                 sendFrameToServer();
+                return;
             }
+
+            if (document.visibilityState === 'visible') {
+                startNetworkTasks();
+                setTimeout(() => {
+                    sendFrameToServer();
+                }, 250);
+            }
+        });
+
+        window.addEventListener('pageshow', () => {
+            startNetworkTasks();
+            setTimeout(() => {
+                sendFrameToServer();
+            }, 250);
         });
 
         window.addEventListener('pagehide', () => {
