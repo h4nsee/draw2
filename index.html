@@ -939,7 +939,7 @@
             });
         }
 
-        function init() {
+        async function init() {
             applyTheme(localStorage.getItem('user_theme') || tg.colorScheme);
 
             if (!gameId) {
@@ -961,8 +961,12 @@
             ctx.fillStyle = DEFAULT_BG_COLOR;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            saveState(true);
-            restoreCanvasOnOpen();
+            await restoreCanvasOnOpen();
+            if (history.length === 0) {
+                saveState(true);
+            } else {
+                updateHistoryButtons();
+            }
 
             const colors = ['#000000', '#7f7f7f', '#8B4513', '#F5F5DC', '#E8BEAC', '#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#006400', '#008080', '#007aff', '#00008B', '#5856d6', '#8e44ad', '#c8a2c8', '#FF69B4', '#ffffff'];
 
@@ -1226,7 +1230,7 @@
 
             try {
                 const res = await fetch(`https://krizisphone.fun/croc_set_custom_word?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}&word=${encodeURIComponent(customWord)}`);
-                const data = await res.json();
+                const data = await parseJsonSafe(res);
 
                 if (!res.ok) {
                     if (data.error === 'Not enough currency') {
@@ -1371,7 +1375,8 @@
                 fetch('https://krizisphone.fun/croc_upload', {
                     method: 'POST',
                     body: formData,
-                    mode: 'cors'
+                    mode: 'cors',
+                    keepalive: true
                 }).catch(e => console.log('Сбой отправки кадра', e));
             }, 'image/png');
         }
@@ -1409,6 +1414,16 @@
         }
 
 
+        async function parseJsonSafe(res) {
+            const text = await res.text();
+            try {
+                return text ? JSON.parse(text) : {};
+            } catch (e) {
+                return { raw_text: text };
+            }
+        }
+
+
         async function requestPrevWord(silent = false) {
             if (!gameId) {
                 if (!silent) alert('Ошибка: нет ID игры');
@@ -1419,10 +1434,10 @@
 
             try {
                 const res = await fetch(`https://krizisphone.fun/croc_prev_word?chat_id=${encodeURIComponent(gameId)}`);
-                const data = await res.json();
+                const data = await parseJsonSafe(res);
 
                 if (!res.ok) {
-                    if (!silent) alert(data.error || 'Не удалось вернуть слово');
+                    if (!silent) alert(data.error || data.raw_text || 'Не удалось вернуть слово');
                     return;
                 }
 
@@ -1448,7 +1463,7 @@
                 const data = await res.json();
 
                 if (!res.ok) {
-                    if (!silent) alert(data.error || 'Не удалось сменить слово');
+                    if (!silent) alert(data.error || data.raw_text || 'Не удалось сменить слово');
                     return;
                 }
 
@@ -1519,15 +1534,29 @@
             frameTimer = setInterval(sendFrameToServer, 6000);
         }
 
+        function sendFrameWithBeacon() {
+            if (!gameId || !isHost || roundFinishedShown || !navigator.sendBeacon) return;
+
+            canvas.toBlob((blob) => {
+                if (!blob) return;
+                const formData = new FormData();
+                formData.append('image', blob, 'drawing.png');
+                formData.append('chat_id', gameId);
+                navigator.sendBeacon('https://krizisphone.fun/croc_upload', formData);
+            }, 'image/png');
+        }
+
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'hidden') {
                 persistCanvasLocally();
+                sendFrameWithBeacon();
                 sendFrameToServer();
             }
         });
 
         window.addEventListener('pagehide', () => {
             persistCanvasLocally();
+            sendFrameWithBeacon();
             sendFrameToServer();
         });
 
