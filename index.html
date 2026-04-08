@@ -737,7 +737,6 @@
         let isHost = true;
         let updateTimer = null;
         let frameTimer = null;
-        let canvasPollTimer = null;
         let closeTimer = null;
         let roundFinishedShown = false;
 
@@ -1101,17 +1100,6 @@
             startNetworkTasks();
         }
 
-        function scheduleImmediateUpload() {
-            if (pendingUploadTimer) {
-                clearTimeout(pendingUploadTimer);
-            }
-
-            pendingUploadTimer = setTimeout(() => {
-                sendFrameToServer();
-                pendingUploadTimer = null;
-            }, 250);
-        }
-
         function saveState(isInitial = false, persistLocal = true) {
             if (history.length > 20) history.shift();
             history.push(canvas.toDataURL('image/png'));
@@ -1124,10 +1112,6 @@
                 persistCanvasLocally();
             }
 
-            if (!isInitial) {
-                scheduleImmediateUpload();
-            }
-
             updateHistoryButtons();
         }
 
@@ -1135,7 +1119,6 @@
             const ok = await restoreCanvasFromDataUrl(dataUrl, false);
             if (ok) {
                 persistCanvasLocally();
-                scheduleImmediateUpload();
             }
         }
 
@@ -1542,34 +1525,6 @@
         }
 
 
-        async function pollCanvasFromServer(force = false) {
-            if (!gameId || roundFinishedShown) return false;
-            if (canvasRestoring && !force) return false;
-
-            try {
-                const res = await fetch(`https://krizisphone.fun/croc_get_canvas?chat_id=${encodeURIComponent(gameId)}&_=${Date.now()}`, { cache: 'no-store' });
-                if (!res.ok) {
-                    return false;
-                }
-
-                const blob = await res.blob();
-                if (!blob || blob.size === 0) {
-                    return false;
-                }
-
-                const objectUrl = URL.createObjectURL(blob);
-                try {
-                    return await restoreCanvasFromDataUrl(objectUrl, true);
-                } finally {
-                    URL.revokeObjectURL(objectUrl);
-                }
-            } catch (e) {
-                console.log('Не удалось обновить холст с сервера', e);
-                return false;
-            }
-        }
-
-
         async function requestPrevWord(silent = false) {
             if (!gameId) {
                 if (!silent) alert('Ошибка: нет ID игры');
@@ -1579,7 +1534,7 @@
             if (!isHost || roundFinishedShown) return;
 
             try {
-                const res = await fetch(`https://krizisphone.fun/croc_prev_word?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}&_=${Date.now()}`, { cache: 'no-store' });
+                const res = await fetch(`https://krizisphone.fun/croc_prev_word?chat_id=${encodeURIComponent(gameId)}&_=${Date.now()}`, { cache: 'no-store' });
                 const data = await parseJsonSafe(res);
 
                 if (!res.ok) {
@@ -1610,7 +1565,7 @@
 
             try {
                 const res = await fetch(`https://krizisphone.fun/croc_change_word?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}&_=${Date.now()}`, { cache: 'no-store' });
-                const data = await parseJsonSafe(res);
+                const data = await res.json();
 
                 if (!res.ok) {
                     if (!silent) alert(data.error || data.raw_text || 'Не удалось сменить слово');
@@ -1636,44 +1591,36 @@
 
             try {
                 const res = await fetch(`https://krizisphone.fun/croc_get_chat?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}&_=${Date.now()}`, { cache: 'no-store' });
-                const data = await parseJsonSafe(res);
+                const data = await res.json();
+                    if (data.host_id && userId && String(data.host_id) !== String(userId)) {
+                        setHostMode(false);
+                    } else {
+                        setHostMode(true);
+                    }
 
-                if (!res.ok) {
-                    console.log('Сбой обновления состояния игры', data);
-                    return;
+                    if (data.word) {
+                        taskText.innerText = data.word;
+                    } else {
+                        taskText.innerText = 'Ожидание слова...';
+                    }
+
+                    currencyName = data.currency_name || 'Очки';
+                    customWordCost = Number(data.custom_word_cost || 15);
+                    customWordPriceText.innerText = `Введите слово. Это спишет ${customWordCost} ${currencyName}.`;
+
+                    renderChatMessages(data.messages || []);
+
+                    if (data.draw_round_id && data.draw_round_id !== currentDrawRoundId) {
+                        await applyRoundId(data.draw_round_id, { restoreCanvas: true });
+                    }
+
+                    if (data.round_finished && data.winner_name && data.guessed_word) {
+                        showRoundFinished(data.winner_name, data.guessed_word);
+                        return;
+                    }
+                } catch (e) {
+                    console.log('Сбой обновления', e);
                 }
-
-                if (data.host_id && userId && String(data.host_id) !== String(userId)) {
-                    setHostMode(false);
-                } else {
-                    setHostMode(true);
-                }
-
-                if (data.word) {
-                    taskText.innerText = data.word;
-                } else {
-                    taskText.innerText = 'Ожидание слова...';
-                }
-
-                currencyName = data.currency_name || 'Очки';
-                customWordCost = Number(data.custom_word_cost || 15);
-                customWordPriceText.innerText = `Введите слово. Это спишет ${customWordCost} ${currencyName}.`;
-
-                renderChatMessages(data.messages || []);
-
-                if (data.draw_round_id && data.draw_round_id !== currentDrawRoundId) {
-                    await applyRoundId(data.draw_round_id, { restoreCanvas: true });
-                } else if (!isHost) {
-                    await pollCanvasFromServer();
-                }
-
-                if (data.round_finished && data.winner_name && data.guessed_word) {
-                    showRoundFinished(data.winner_name, data.guessed_word);
-                    return;
-                }
-            } catch (e) {
-                console.log('Сбой обновления', e);
-            }
         }
 
         function startNetworkTasks() {
@@ -1681,15 +1628,9 @@
 
             if (updateTimer) clearInterval(updateTimer);
             if (frameTimer) clearInterval(frameTimer);
-            if (canvasPollTimer) clearInterval(canvasPollTimer);
 
             updateTimer = setInterval(fetchUpdate, 2000);
-            frameTimer = setInterval(sendFrameToServer, 15000);
-            canvasPollTimer = setInterval(() => {
-                if (!isHost && !roundFinishedShown) {
-                    pollCanvasFromServer();
-                }
-            }, 2500);
+            frameTimer = setInterval(sendFrameToServer, 5000);
         }
 
         function sendFrameWithBeacon() {
@@ -1714,14 +1655,12 @@
             if (document.visibilityState === 'visible') {
                 startNetworkTasks();
                 fetchUpdate();
-                pollCanvasFromServer(true);
             }
         });
 
         window.addEventListener('pageshow', () => {
             startNetworkTasks();
             fetchUpdate();
-            pollCanvasFromServer(true);
         });
 
         window.addEventListener('pagehide', () => {
