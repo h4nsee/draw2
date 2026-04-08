@@ -1365,7 +1365,7 @@
                 }
 
                 if (data.draw_round_id) {
-                    await applyRoundId(data.draw_round_id, { restoreCanvas: true });
+                    await applyRoundId(data.draw_round_id, { restoreCanvas: false });
                 }
 
                 currencyName = data.currency_name || currencyName;
@@ -1561,7 +1561,7 @@
                 if (data.word) {
                     taskText.innerText = data.word;
                     if (data.draw_round_id) {
-                        await applyRoundId(data.draw_round_id, { restoreCanvas: true });
+                        await applyRoundId(data.draw_round_id, { restoreCanvas: false });
                     } else {
                         clearCanvas();
                     }
@@ -1591,7 +1591,7 @@
                 if (data.new_word) {
                     taskText.innerText = data.new_word;
                     if (data.draw_round_id) {
-                        await applyRoundId(data.draw_round_id, { restoreCanvas: true });
+                        await applyRoundId(data.draw_round_id, { restoreCanvas: false });
                     } else {
                         clearCanvas();
                     }
