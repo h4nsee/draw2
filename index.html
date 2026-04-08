@@ -584,7 +584,7 @@
 
     <div class="top-bar" id="top-bar">
         <div class="task-wrapper">
-            <div class="task-label">Нарисуй:</div>
+            <div class="task-label">Рисуй:</div>
             <div class="task-text" id="task-text">Загрузка...</div>
         </div>
         <div class="top-controls">
@@ -743,7 +743,7 @@
         let currencyName = 'Очки';
         let customWordCost = 15;
         let canvasRestoring = false;
-        let pendingUploadTimer = null;
+        let uploadInProgress = false;
         let currentDrawRoundId = null;
         let currentCanvasStorageKey = null;
 
@@ -1099,6 +1099,7 @@
             initBrushesSelector();
             startNetworkTasks();
         }
+
 
         function saveState(isInitial = false, persistLocal = true) {
             if (history.length > 20) history.shift();
@@ -1465,9 +1466,16 @@
 
         function sendFrameToServer() {
             if (!gameId || !isHost || roundFinishedShown || canvasRestoring) return;
+            if (uploadInProgress) return;
+
+            uploadInProgress = true;
+            console.log('upload start');
 
             canvas.toBlob((blob) => {
-                if (!blob) return;
+                if (!blob) {
+                    uploadInProgress = false;
+                    return;
+                }
 
                 const formData = new FormData();
                 formData.append('image', blob, 'drawing.png');
@@ -1477,8 +1485,21 @@
                     method: 'POST',
                     body: formData,
                     mode: 'cors',
-                    keepalive: true
-                }).catch(e => console.log('Сбой отправки кадра', e));
+                    cache: 'no-store'
+                })
+                .then(async (res) => {
+                    if (!res.ok) {
+                        const raw = await res.text().catch(() => '');
+                        throw new Error(`HTTP ${res.status} ${raw}`);
+                    }
+                    console.log('upload success');
+                })
+                .catch((e) => {
+                    console.log('Сбой отправки кадра', e);
+                })
+                .finally(() => {
+                    uploadInProgress = false;
+                });
             }, 'image/png');
         }
 
