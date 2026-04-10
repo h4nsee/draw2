@@ -1052,7 +1052,13 @@
 
             const initialState = await fetchInitialGameState();
             if (initialState) {
-                if (initialState.host_id && userId && String(initialState.host_id) !== String(userId)) {
+                if (initialState.blocked_user) {
+                    setHostMode(false);
+                    const title = document.querySelector('.lock-title');
+                    const text = document.querySelector('.lock-text');
+                    if (title) title.textContent = "Доступ запрещён";
+                    if (text) text.innerHTML = "Для этого аккаунта участие в рисовалке отключено.";
+                } else if (initialState.host_id && userId && String(initialState.host_id) !== String(userId)) {
                     setHostMode(false);
                 } else {
                     setHostMode(true);
@@ -1613,7 +1619,13 @@
             try {
                 const res = await fetch(`https://krizisphone.fun/croc_get_chat?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}&_=${Date.now()}`, { cache: 'no-store' });
                 const data = await res.json();
-                    if (data.host_id && userId && String(data.host_id) !== String(userId)) {
+                    if (data.blocked_user) {
+                        setHostMode(false);
+                        const title = document.querySelector('.lock-title');
+                        const text = document.querySelector('.lock-text');
+                        if (title) title.textContent = "Доступ запрещён";
+                        if (text) text.innerHTML = "Для этого аккаунта участие в рисовалке отключено.";
+                    } else if (data.host_id && userId && String(data.host_id) !== String(userId)) {
                         setHostMode(false);
                     } else {
                         setHostMode(true);
