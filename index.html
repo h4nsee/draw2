@@ -173,6 +173,7 @@
             cursor: crosshair;
             background-color: var(--canvas-bg);
             outline: 2px solid var(--accent-color);
+            transition: transform 0.18s ease-out;
         }
 
         .chat-box {
@@ -746,6 +747,7 @@
         let uploadInProgress = false;
         let currentDrawRoundId = null;
         let currentCanvasStorageKey = null;
+        let resizeRafId = null;
 
         goToChatBtn.onclick = () => {
             tg.close();
@@ -754,6 +756,91 @@
         function updateHistoryButtons() {
             undoBtn.disabled = history.length <= 1;
             redoBtn.disabled = redoHistory.length === 0;
+        }
+
+        function getCanvasViewportMetrics() {
+            const container = document.getElementById('canvas-wrapper');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            return {
+                container,
+                width,
+                height,
+                maxOffsetX: Math.max(0, (width * currentScale - width) / 2),
+                maxOffsetY: Math.max(0, (height * currentScale - height) / 2)
+            };
+        }
+
+        function clampTranslation(x, y) {
+            if (currentScale <= 1) {
+                return { x: 0, y: 0 };
+            }
+
+            const { maxOffsetX, maxOffsetY } = getCanvasViewportMetrics();
+
+            return {
+                x: Math.min(maxOffsetX, Math.max(-maxOffsetX, x)),
+                y: Math.min(maxOffsetY, Math.max(-maxOffsetY, y))
+            };
+        }
+
+        function applyElasticTranslation(x, y) {
+            if (currentScale <= 1) {
+                return { x: 0, y: 0 };
+            }
+
+            const { maxOffsetX, maxOffsetY } = getCanvasViewportMetrics();
+            const elasticity = 0.28;
+
+            const softenAxis = (value, limit) => {
+                if (limit <= 0) return 0;
+                if (value > limit) return limit + (value - limit) * elasticity;
+                if (value < -limit) return -limit + (value + limit) * elasticity;
+                return value;
+            };
+
+            return {
+                x: softenAxis(x, maxOffsetX),
+                y: softenAxis(y, maxOffsetY)
+            };
+        }
+
+        function applyCanvasTransform(animate = false) {
+            canvas.style.transition = animate ? 'transform 0.18s ease-out' : 'none';
+            canvas.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
+        }
+
+        async function resizeCanvasToContainer() {
+            const snapshot = canvas.toDataURL('image/png');
+            const { width, height } = getCanvasViewportMetrics();
+            const dpr = window.devicePixelRatio || 1;
+
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
+            canvas.style.width = width + 'px';
+            canvas.style.height = height + 'px';
+
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.scale(dpr, dpr);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.fillStyle = DEFAULT_BG_COLOR;
+            ctx.fillRect(0, 0, width, height);
+
+            if (snapshot && snapshot !== 'data:,') {
+                await restoreCanvasFromDataUrl(snapshot, false);
+            }
+
+            const clamped = clampTranslation(translateX, translateY);
+            translateX = clamped.x;
+            translateY = clamped.y;
+            applyCanvasTransform(true);
+
+            if (history.length > 0) {
+                history[history.length - 1] = canvas.toDataURL('image/png');
+                persistCanvasLocally();
+            }
         }
 
         function showError(text) {
@@ -1036,14 +1123,14 @@
                 return;
             }
 
-            const container = document.getElementById('canvas-wrapper');
+            const { width, height } = getCanvasViewportMetrics();
             const dpr = window.devicePixelRatio || 1;
 
-            canvas.width = container.clientWidth * dpr;
-            canvas.height = container.clientHeight * dpr;
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
             ctx.scale(dpr, dpr);
-            canvas.style.width = container.clientWidth + 'px';
-            canvas.style.height = container.clientHeight + 'px';
+            canvas.style.width = width + 'px';
+            canvas.style.height = height + 'px';
 
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
@@ -1416,15 +1503,14 @@
 
                 const deltaScale = currentDistance / initialPinchDistance;
                 currentScale = Math.max(1, Math.min(startScale * deltaScale, 4));
-                translateX = startTranslateX + (currentCenter.x - initialPinchCenter.x);
-                translateY = startTranslateY + (currentCenter.y - initialPinchCenter.y);
 
-                if (currentScale === 1) {
-                    translateX = 0;
-                    translateY = 0;
-                }
+                const nextTranslateX = startTranslateX + (currentCenter.x - initialPinchCenter.x);
+                const nextTranslateY = startTranslateY + (currentCenter.y - initialPinchCenter.y);
+                const elastic = applyElasticTranslation(nextTranslateX, nextTranslateY);
 
-                canvas.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
+                translateX = elastic.x;
+                translateY = elastic.y;
+                applyCanvasTransform(false);
                 return;
             }
 
@@ -1440,11 +1526,29 @@
             if (e.touches.length < 2) {
                 initialPinchDistance = null;
                 initialPinchCenter = null;
+
+                const clamped = clampTranslation(translateX, translateY);
+                translateX = clamped.x;
+                translateY = clamped.y;
+                applyCanvasTransform(true);
             }
 
             if (drawing && e.touches.length === 0) {
                 endDrawingLogic();
             }
+        });
+
+        canvas.addEventListener('touchcancel', () => {
+            if (!isHost) return;
+
+            drawing = false;
+            initialPinchDistance = null;
+            initialPinchCenter = null;
+
+            const clamped = clampTranslation(translateX, translateY);
+            translateX = clamped.x;
+            translateY = clamped.y;
+            applyCanvasTransform(true);
         });
 
         canvas.addEventListener('mousedown', (e) => {
@@ -1694,6 +1798,22 @@
         window.addEventListener('pageshow', () => {
             startNetworkTasks();
             fetchUpdate();
+        });
+
+        window.addEventListener('resize', () => {
+            if (resizeRafId) cancelAnimationFrame(resizeRafId);
+            resizeRafId = requestAnimationFrame(async () => {
+                resizeRafId = null;
+                await resizeCanvasToContainer();
+            });
+        });
+
+        window.addEventListener('orientationchange', () => {
+            if (resizeRafId) cancelAnimationFrame(resizeRafId);
+            resizeRafId = requestAnimationFrame(async () => {
+                resizeRafId = null;
+                await resizeCanvasToContainer();
+            });
         });
 
         window.addEventListener('pagehide', () => {
