@@ -1002,9 +1002,10 @@
             if (!gameId) return null;
 
             try {
-                const res = await fetch(`https://krizisphone.fun/croc_get_chat?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}`);
-                if (!res.ok) return null;
-                return await res.json();
+                const res = await fetch(`https://krizisphone.fun/croc_get_chat?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}&_=${Date.now()}`, { cache: 'no-store' });
+                const data = await parseJsonSafe(res);
+                if (!res.ok) return { ok: false, error: data.error || data.raw_text || 'Не удалось получить игру' };
+                return data;
             } catch (e) {
                 console.log('Не удалось получить стартовые данные игры', e);
                 return null;
@@ -1138,6 +1139,16 @@
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             const initialState = await fetchInitialGameState();
+            if (!initialState) {
+                showError('Не удалось связаться с сервером. Закройте холст и откройте его заново из сообщения бота.');
+                return;
+            }
+
+            if (initialState.active === false) {
+                showError('Игра не найдена или уже завершена. Запустите новую игру и откройте новый холст.');
+                return;
+            }
+
             if (initialState) {
                 if (initialState.blocked_user) {
                     setHostMode(false);
@@ -1420,10 +1431,10 @@
             }
 
             try {
-                const res = await fetch(`https://krizisphone.fun/croc_set_custom_word?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}&word=${encodeURIComponent(customWord)}`);
+                const res = await fetch(`https://krizisphone.fun/croc_set_custom_word?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}&word=${encodeURIComponent(customWord)}`, { cache: 'no-store' });
                 const data = await parseJsonSafe(res);
 
-                if (!res.ok) {
+                if (!res.ok || data.ok === false) {
                     if (data.error === 'Not enough currency') {
                         alert(`Недостаточно валюты.\nНужно: ${data.custom_word_cost} ${data.currency_name}\nУ вас: ${data.balance} ${data.currency_name}`);
                         return;
@@ -1434,7 +1445,7 @@
                         return;
                     }
 
-                    alert(data.error || 'Не удалось поставить свое слово');
+                    alert(data.error || data.raw_text || 'Не удалось поставить свое слово');
                     return;
                 }
 
@@ -1668,13 +1679,14 @@
                 const res = await fetch(`https://krizisphone.fun/croc_prev_word?chat_id=${encodeURIComponent(gameId)}&_=${Date.now()}`, { cache: 'no-store' });
                 const data = await parseJsonSafe(res);
 
-                if (!res.ok) {
+                if (!res.ok || data.ok === false) {
                     if (!silent) alert(data.error || data.raw_text || 'Не удалось вернуть слово');
                     return;
                 }
 
-                if (data.word) {
-                    taskText.innerText = data.word;
+                const nextWord = data.new_word || data.word;
+                if (nextWord) {
+                    taskText.innerText = nextWord;
                     if (data.draw_round_id) {
                         await applyRoundId(data.draw_round_id, { restoreCanvas: false });
                     } else {
@@ -1696,9 +1708,9 @@
 
             try {
                 const res = await fetch(`https://krizisphone.fun/croc_change_word?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}&_=${Date.now()}`, { cache: 'no-store' });
-                const data = await res.json();
+                const data = await parseJsonSafe(res);
 
-                if (!res.ok) {
+                if (!res.ok || data.ok === false) {
                     if (!silent) alert(data.error || data.raw_text || 'Не удалось сменить слово');
                     return;
                 }
@@ -1722,7 +1734,15 @@
 
             try {
                 const res = await fetch(`https://krizisphone.fun/croc_get_chat?chat_id=${encodeURIComponent(gameId)}&user_id=${encodeURIComponent(userId || '')}&_=${Date.now()}`, { cache: 'no-store' });
-                const data = await res.json();
+                const data = await parseJsonSafe(res);
+                    if (!res.ok || data.ok === false) {
+                        console.log('Сбой обновления', data.error || data.raw_text || res.status);
+                        return;
+                    }
+                    if (data.active === false) {
+                        showError('Игра не найдена или уже завершена. Запустите новую игру и откройте новый холст.');
+                        return;
+                    }
                     if (data.blocked_user) {
                         setHostMode(false);
                         const title = document.querySelector('.lock-title');
